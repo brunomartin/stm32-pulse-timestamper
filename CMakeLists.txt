@@ -20,7 +20,7 @@ add_definitions(${CPU_FLAGS} ${GCC_FLAGS} --specs=nano.specs)
 add_definitions(-DSTM32L476xx -DUSE_HAL_DRIVER)
 
 set(CMSIS_DIR ${CMAKE_SOURCE_DIR}/hal/cmsis)
-set(STM32L4XX_HAL ${CMAKE_SOURCE_DIR}/hal/stm32l4xx_hal/inc)
+set(STM32L4XX_HAL ${CMAKE_SOURCE_DIR}/hal/stm32l4xx_hal/Inc)
 set(STM32L4XX_HAL_LEGACY ${STM32L4XX_HAL}/Legacy)
 set(SYSTEM_DIR ${CMAKE_SOURCE_DIR}/hal/system)
 set(APP_DIR ${CMAKE_SOURCE_DIR}/app)
