@@ -4,6 +4,63 @@
 RCC_OscInitTypeDef RCC_OscInitStruct;
 RCC_ClkInitTypeDef RCC_ClkInitStruct;
 
+GPIO_InitTypeDef GPIO_InitStruct;
+
+const uint32_t pulses = 1e6;
+uint32_t count = 0;
+
+#define WITH_UART
+#undef WITH_UART
+
+#ifdef WITH_UART
+
+/* Definition for USARTx clock resources */
+#define USARTx                           USART2
+#define USARTx_CLK_ENABLE()              __HAL_RCC_USART2_CLK_ENABLE()
+#define USARTx_RX_GPIO_CLK_ENABLE()      __HAL_RCC_GPIOA_CLK_ENABLE()
+#define USARTx_TX_GPIO_CLK_ENABLE()      __HAL_RCC_GPIOA_CLK_ENABLE()
+
+#define USARTx_FORCE_RESET()             __HAL_RCC_USART2_FORCE_RESET()
+#define USARTx_RELEASE_RESET()           __HAL_RCC_USART2_RELEASE_RESET()
+
+/* Definition for USARTx Pins */
+#define USARTx_TX_PIN                    GPIO_PIN_2
+#define USARTx_TX_GPIO_PORT              GPIOA
+#define USARTx_TX_AF                     GPIO_AF7_USART2
+#define USARTx_RX_PIN                    GPIO_PIN_3
+#define USARTx_RX_GPIO_PORT              GPIOA
+#define USARTx_RX_AF                     GPIO_AF7_USART2
+
+/* Definition for USARTx's NVIC IRQ and IRQ Handlers */
+#define USARTx_IRQn                      USART2_IRQn
+#define USARTx_IRQHandler                USART2_IRQHandler
+
+/* Size of Transmission buffer */
+#define TXSTARTMESSAGESIZE                   (COUNTOF(aTxStartMessage) - 1)
+#define TXENDMESSAGESIZE                     (COUNTOF(aTxEndMessage) - 1)
+
+/* Size of Reception buffer */
+#define RXBUFFERSIZE                      10
+
+/* Exported macro ------------------------------------------------------------*/
+#define COUNTOF(__BUFFER__)   (sizeof(__BUFFER__) / sizeof(*(__BUFFER__)))
+
+UART_HandleTypeDef UartHandle;
+__IO uint8_t  ubTxComplete = 0;
+__IO uint8_t  ubRxComplete = 0;
+
+/* Buffer used for transmission */
+uint8_t aTxStartMessage[] = "\n\r ****UART-Hyperterminal communication based on IT (Mixed HAL/LL usage) ****\n\r Enter 10 characters using keyboard :\n\r";
+__IO uint32_t uwTxIndex = 0;
+uint8_t ubSizeToSend = sizeof(aTxStartMessage);
+uint8_t aTxEndMessage[] = "\n\r Example Finished\n\r";
+
+/* Buffer used for reception */
+uint8_t aRxBuffer[RXBUFFERSIZE];
+__IO uint32_t uwRxIndex = 0;
+
+#endif
+
 void SystemClock_Config(void);
 void Error_Handler(void);
 
@@ -29,14 +86,10 @@ int main(void)
   SystemClock_Config();
   /* Initialize all configured peripherals */
 
-  const uint32_t pulses = 0;
-  uint32_t count = 0;
-
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
 
-  GPIO_InitTypeDef GPIO_InitStruct;
   GPIO_InitStruct.Pin = GPIO_PIN_5;
   // GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
@@ -45,9 +98,6 @@ int main(void)
 
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  // Wait 10 ms to let system setup
-  HAL_Delay(10);
-
   for(count=0;count<pulses;count++) {
     // BSP_LedToggle(GREEN);
     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
@@ -55,7 +105,10 @@ int main(void)
     delay_ticks(40);
   }
 
-  return 0;
+  /* Infinite loop */
+  while (1) {
+
+  }
 }
 
 // System Clock Configuration
@@ -112,6 +165,97 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler */ 
 }
+
+#ifdef WITH_UART
+
+/**
+  * @brief  Rx Transfer completed callback
+  * @note   This example shows a simple way to report end of IT Rx transfer, and 
+  *         you can add your own implementation.
+  * @retval None
+  */
+void UART_CharReception_Callback(void)
+{
+  /* Read Received character. RXNE flag is cleared by reading of RDR register */
+  aRxBuffer[uwRxIndex++] = LL_USART_ReceiveData8(USARTx);
+
+  /* Check if reception is completed (expected nb of bytes has been received) */
+  if (uwRxIndex == RXBUFFERSIZE)
+  {
+    /* Set Reception complete boolean to 1 */
+    ubRxComplete = 1;
+  }
+}
+
+/**
+  * @brief  Function called for achieving next TX Byte sending
+  * @retval None
+  */
+void UART_TXEmpty_Callback(void)
+{
+  if(uwTxIndex == (ubSizeToSend - 1))
+  {
+    /* Disable TXE interrupt */
+    LL_USART_DisableIT_TXE(USARTx);
+    
+    /* Enable TC interrupt */
+    LL_USART_EnableIT_TC(USARTx);
+  }
+
+  /* Fill TDR with a new char */
+  LL_USART_TransmitData8(USARTx, aTxStartMessage[uwTxIndex++]);
+}
+
+/**
+  * @brief  Function called at completion of last byte transmission
+  * @retval None
+  */
+void UART_CharTransmitComplete_Callback(void)
+{
+  if(uwTxIndex == sizeof(aTxStartMessage))
+  {
+    uwTxIndex = 0;
+    
+    /* Disable TC interrupt */
+    LL_USART_DisableIT_TC(USARTx);
+    
+    /* Set Tx complete boolean to 1 */
+    ubTxComplete = 1;
+  }
+}
+
+/**
+  * @brief  UART error callbacks
+  * @note   This example shows a simple way to report transfer error, and you can
+  *         add your own implementation.
+  * @retval None
+  */
+void UART_Error_Callback(void)
+{
+  __IO uint32_t isr_reg;
+
+  /* Disable USARTx_IRQn */
+  NVIC_DisableIRQ(USARTx_IRQn);
+  
+  /* Error handling example :
+    - Read USART ISR register to identify flag that leads to IT raising
+    - Perform corresponding error handling treatment according to flag
+  */
+  isr_reg = LL_USART_ReadReg(USARTx, ISR);
+  if (isr_reg & LL_USART_ISR_NE)
+  {
+    /* Turn LED2 off: Transfer error in reception/transmission process */
+    BSP_LED_Off(LED2);
+  }
+  else
+  {
+    /* Turn LED2 off: Transfer error in reception/transmission process */
+    BSP_LED_Off(LED2);
+  }
+}
+
+#endif
+
 
 #ifdef USE_FULL_ASSERT
 
