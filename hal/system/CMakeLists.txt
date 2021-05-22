@@ -1,6 +1,5 @@
 set(startup_src armgcc/startup_stm32l476xx.s)
-set(system_src gpio.c
-               stm32l4xx_hal_msp.c 
+set(system_src stm32l4xx_hal_msp.c 
                stm32l4xx_it.c 
                system_stm32l4xx.c)
 

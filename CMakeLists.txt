@@ -24,7 +24,7 @@ set(STM32L4XX_HAL ${CMAKE_SOURCE_DIR}/hal/stm32l4xx_hal/inc)
 set(STM32L4XX_HAL_LEGACY ${STM32L4XX_HAL}/Legacy)
 set(SYSTEM_DIR ${CMAKE_SOURCE_DIR}/hal/system)
 set(APP_DIR ${CMAKE_SOURCE_DIR}/app)
-set(BSP_DIR ${CMAKE_SOURCE_DIR}/hal/bsp)
+# set(BSP_DIR ${CMAKE_SOURCE_DIR}/hal/bsp)
 
 include_directories(
   ${CMSIS_DIR}

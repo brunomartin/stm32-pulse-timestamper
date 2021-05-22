@@ -1,10 +1,8 @@
-#include "main.h"
-#include "stm32l4xx_hal.h"
-#include "gpio.h"
-#include "bsp_led.h"
 
-  RCC_OscInitTypeDef RCC_OscInitStruct;
-  RCC_ClkInitTypeDef RCC_ClkInitStruct;
+#include "stm32l4xx_hal.h"
+
+RCC_OscInitTypeDef RCC_OscInitStruct;
+RCC_ClkInitTypeDef RCC_ClkInitStruct;
 
 void SystemClock_Config(void);
 void Error_Handler(void);
