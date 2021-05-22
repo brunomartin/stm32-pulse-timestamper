@@ -3,12 +3,15 @@
 #include "gpio.h"
 #include "bsp_led.h"
 
+  RCC_OscInitTypeDef RCC_OscInitStruct;
+  RCC_ClkInitTypeDef RCC_ClkInitStruct;
+
 void SystemClock_Config(void);
 void Error_Handler(void);
 
 void delay_ticks(uint32_t ticks)
 {
-    SysTick->LOAD = ticks;
+    SysTick->LOAD = ticks*RCC_OscInitStruct.HSICalibrationValue;
     SysTick->VAL = 0;
     SysTick->CTRL = SysTick_CTRL_ENABLE_Msk;
     // SysTick->CTRL &= ~SYSTICK_CLKSOURCE_HCLK_DIV8;
@@ -28,24 +31,24 @@ int main(void)
   SystemClock_Config();
   /* Initialize all configured peripherals */
 
+  const uint64_t pulses = 1e6;
+
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   GPIO_InitTypeDef GPIO_InitStruct;
   GPIO_InitStruct.Pin = GPIO_PIN_5;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
 
-  uint64_t pulses = 1e5;
-
   for(int i=0;i<pulses;i++) {
     // BSP_LedToggle(GREEN);
     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
     // HAL_Delay(1);
-    delay_ticks(100);
+    delay_ticks(40);
   }
 
   return 0;
@@ -54,12 +57,12 @@ int main(void)
 // System Clock Configuration
 void SystemClock_Config(void)
 {
-  RCC_OscInitTypeDef RCC_OscInitStruct;
-  RCC_ClkInitTypeDef RCC_ClkInitStruct;
   // Initializes the CPU, AHB and APB busses clocks
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = 16;
+  // RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  // RCC_OscInitStruct.HSICalibrationValue = 16;
+  RCC_OscInitStruct.HSICalibrationValue = 1;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
     Error_Handler();
@@ -67,6 +70,7 @@ void SystemClock_Config(void)
   // Initializes the CPU, AHB and APB busses clocks
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
           |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  // RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_MSI;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
   // RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSE;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
