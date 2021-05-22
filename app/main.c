@@ -29,20 +29,26 @@ int main(void)
   SystemClock_Config();
   /* Initialize all configured peripherals */
 
-  const uint64_t pulses = 1e6;
+  const uint32_t pulses = 0;
+  uint32_t count = 0;
 
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
-  GPIO_InitTypeDef GPIO_InitStruct;
-  GPIO_InitStruct.Pin = GPIO_PIN_5;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
 
-  for(int i=0;i<pulses;i++) {
+  GPIO_InitTypeDef GPIO_InitStruct;
+  GPIO_InitStruct.Pin = GPIO_PIN_5;
+  // GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  // Wait 10 ms to let system setup
+  HAL_Delay(10);
+
+  for(count=0;count<pulses;count++) {
     // BSP_LedToggle(GREEN);
     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
     // HAL_Delay(1);
