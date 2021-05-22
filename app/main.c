@@ -6,6 +6,20 @@
 void SystemClock_Config(void);
 void Error_Handler(void);
 
+void delay_ticks(uint32_t ticks)
+{
+    SysTick->LOAD = ticks;
+    SysTick->VAL = 0;
+    SysTick->CTRL = SysTick_CTRL_ENABLE_Msk;
+    // SysTick->CTRL &= ~SYSTICK_CLKSOURCE_HCLK_DIV8;
+    // SysTick->CTRL |= SYSTICK_CLKSOURCE_HCLK;
+
+    // COUNTFLAG is a bit that is set to 1 when counter reaches 0.
+    // It's automatically cleared when read.
+    while ((SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) == 0);
+    SysTick->CTRL = 0;
+}
+
 int main(void)
 {
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
@@ -13,12 +27,25 @@ int main(void)
   /* Configure the system clock */
   SystemClock_Config();
   /* Initialize all configured peripherals */
-  MX_GPIO_Init();
 
-  while (1)
-  {
-    BSP_LedToggle(GREEN);
-    HAL_Delay(1000);
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+
+  GPIO_InitTypeDef GPIO_InitStruct;
+  GPIO_InitStruct.Pin = GPIO_PIN_5;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+
+  uint64_t pulses = 1e5;
+
+  for(int i=0;i<pulses;i++) {
+    // BSP_LedToggle(GREEN);
+    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+    // HAL_Delay(1);
+    delay_ticks(100);
   }
 
   return 0;
@@ -41,6 +68,7 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
           |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  // RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSE;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
@@ -56,6 +84,7 @@ void SystemClock_Config(void)
   
   // Configure the Systick interrupt time
   HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
+  // HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq());
   // Configure the Systick
   HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
   // SysTick_IRQn interrupt configuration

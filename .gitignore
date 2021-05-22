@@ -3,6 +3,7 @@
 
 # CMake
 cmake-build*/*
+build
 
 # STM32CubeMX
 Cube/*
@@ -14,3 +15,4 @@ Cube/*
 # Docs
 docs/html
 **/*doxygen*.db
+*.DS_Store
