@@ -17,7 +17,7 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${CPU_FLAGS} -T\"${STM32L4
 # CPU defs
 add_definitions(${CPU_FLAGS} ${GCC_FLAGS} --specs=nano.specs)
 # System defs
-add_definitions(-DSTM32L476xx -DUSE_HAL_DRIVER)
+add_definitions(-DSTM32L476xx)
 
 set(CMSIS_DIR ${CMAKE_SOURCE_DIR}/hal/cmsis)
 set(STM32L4XX_HAL ${CMAKE_SOURCE_DIR}/hal/stm32l4xx_hal/Inc)
