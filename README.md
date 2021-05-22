@@ -7,6 +7,13 @@ To generate native makefiles structure, please create *build* folder to not poll
 your current workspace and launch CMake generation. It is assumed that ARM GCC toolchain path is added to the PATH environment variable.
 If not - you could add it with `set` (Windows) or `export` (Unix) command: `export PATH=<path/to/arm-none-eabi/toolchain>:$PATH`.
 
+- Generate for minimum size release
+```bash
+mkdir -p build && cd build
+# Command to generate MinGW Makefiles
+cmake -DCMAKE_TOOLCHAIN_FILE=../arm-gcc-toolchain.cmake -DCMAKE_BUILD_TYPE=Release ..
+```
+
 - Generate MinGW Makefiles
 ```bash
 mkdir cmake-build-debug

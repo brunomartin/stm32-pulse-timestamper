@@ -37,3 +37,13 @@ include_directories(
 
 add_subdirectory(app/)
 add_subdirectory(hal/)
+
+add_custom_command(OUTPUT arm_hello_world.flash
+  COMMAND st-flash --reset write app/hello_world.bin 0x8000000
+  WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+  DEPENDS hello_world
+  COMMENT "flashing app/arm_hello_world.bin..."
+  VERBATIM
+)
+
+add_custom_target(flash DEPENDS arm_hello_world.flash)
