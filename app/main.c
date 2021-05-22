@@ -6,7 +6,7 @@ RCC_ClkInitTypeDef RCC_ClkInitStruct;
 
 GPIO_InitTypeDef GPIO_InitStruct;
 
-const uint32_t pulses = 1e6;
+const uint32_t pulses = 0;
 uint32_t count = 0;
 
 #define WITH_UART
