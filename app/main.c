@@ -1,16 +1,15 @@
 
 #include "stm32l4xx_hal.h"
 
+#include "stm32l4xx_ll_usart.h"
+
 RCC_OscInitTypeDef RCC_OscInitStruct;
 RCC_ClkInitTypeDef RCC_ClkInitStruct;
 
 GPIO_InitTypeDef GPIO_InitStruct;
 
-const uint32_t pulses = 0;
-uint32_t count = 0;
-
 #define WITH_UART
-#undef WITH_UART
+// #undef WITH_UART
 
 #ifdef WITH_UART
 
@@ -59,6 +58,78 @@ uint8_t aTxEndMessage[] = "\n\r Example Finished\n\r";
 uint8_t aRxBuffer[RXBUFFERSIZE];
 __IO uint32_t uwRxIndex = 0;
 
+/** @defgroup HAL_MSP_Private_Functions
+  * @{
+  */
+
+/**
+  * @brief UART MSP Initialization
+  *        This function configures the hardware resources used in this example:
+  *           - Peripheral's clock enable
+  *           - Peripheral's GPIO Configuration
+  *           - Peripheral's GPIO Configuration  
+  *           - NVIC configuration for UART interrupt request enable
+  * @param huart: UART handle pointer
+  * @retval None
+  */
+void HAL_UART_MspInit(UART_HandleTypeDef *huart)
+{
+  GPIO_InitTypeDef  GPIO_InitStruct;
+
+  /*##-1- Enable peripherals and GPIO Clocks #################################*/
+  /* Enable GPIO TX/RX clock */
+  USARTx_TX_GPIO_CLK_ENABLE();
+  USARTx_RX_GPIO_CLK_ENABLE();
+
+  /* Enable USARTx clock */
+  USARTx_CLK_ENABLE();
+
+  /*##-2- Configure peripheral GPIO ##########################################*/
+  /* UART TX GPIO pin configuration  */
+  GPIO_InitStruct.Pin       = USARTx_TX_PIN;
+  GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull      = GPIO_PULLUP;
+  GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_VERY_HIGH;
+  GPIO_InitStruct.Alternate = USARTx_TX_AF;
+
+  HAL_GPIO_Init(USARTx_TX_GPIO_PORT, &GPIO_InitStruct);
+
+  /* UART RX GPIO pin configuration  */
+  GPIO_InitStruct.Pin       = USARTx_RX_PIN;
+  GPIO_InitStruct.Alternate = USARTx_RX_AF;
+
+  HAL_GPIO_Init(USARTx_RX_GPIO_PORT, &GPIO_InitStruct);
+    
+  /*##-3- Configure the NVIC for UART ########################################*/   
+  /* NVIC for USARTx */
+  HAL_NVIC_SetPriority(USARTx_IRQn, 0, 1);
+  HAL_NVIC_EnableIRQ(USARTx_IRQn);
+}
+
+/**
+  * @brief UART MSP De-Initialization
+  *        This function frees the hardware resources used in this example:
+  *          - Disable the Peripheral's clock
+  *          - Revert GPIO and NVIC configuration to their default state
+  * @param huart: UART handle pointer
+  * @retval None
+  */
+void HAL_UART_MspDeInit(UART_HandleTypeDef *huart)
+{
+  /*##-1- Reset peripherals ##################################################*/
+  USARTx_FORCE_RESET();
+  USARTx_RELEASE_RESET();
+
+  /*##-2- Disable peripherals and GPIO Clocks ################################*/
+  /* Configure UART Tx as alternate function  */
+  HAL_GPIO_DeInit(USARTx_TX_GPIO_PORT, USARTx_TX_PIN);
+  /* Configure UART Rx as alternate function  */
+  HAL_GPIO_DeInit(USARTx_RX_GPIO_PORT, USARTx_RX_PIN);
+  
+  /*##-3- Disable the NVIC for UART ##########################################*/
+  HAL_NVIC_DisableIRQ(USARTx_IRQn);
+}
+
 #endif
 
 void SystemClock_Config(void);
@@ -98,11 +169,92 @@ int main(void)
 
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  const uint32_t pulses = 1e6;
+  uint32_t count = 0;
+  double period = 40;
+
   for(count=0;count<pulses;count++) {
-    // BSP_LedToggle(GREEN);
-    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-    // HAL_Delay(1);
-    delay_ticks(40);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+    // delay_ticks(period/2);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+    // delay_ticks(period/2);
+  }
+
+  /*##-1- Configure the UART peripheral using HAL services ###################*/
+  /* Put the USART peripheral in the Asynchronous mode (UART Mode) */
+  /* UART configured as follows:
+      - Word Length = 8 Bits (7 data bit + 1 parity bit) : 
+	                  BE CAREFUL : Program 7 data bits + 1 parity bit in PC HyperTerminal
+      - Stop Bit    = One Stop bit
+      - Parity      = ODD parity
+      - BaudRate    = 9600 baud
+      - Hardware flow control disabled (RTS and CTS signals) */
+  UartHandle.Instance        = USARTx;
+
+  UartHandle.Init.BaudRate   = 9600;
+  UartHandle.Init.WordLength = UART_WORDLENGTH_8B;
+  UartHandle.Init.StopBits   = UART_STOPBITS_1;
+  UartHandle.Init.Parity     = UART_PARITY_ODD;
+  UartHandle.Init.HwFlowCtl  = UART_HWCONTROL_NONE;
+  UartHandle.Init.Mode       = UART_MODE_TX_RX;
+  UartHandle.Init.OverSampling = UART_OVERSAMPLING_16;
+
+  if(HAL_UART_Init(&UartHandle) != HAL_OK)
+  {
+    /* Initialization Error */
+    Error_Handler();
+  }
+
+  HAL_UART_MspInit(&UartHandle);
+
+  /*##-2- Configure UART peripheral for reception process (using LL) ##########*/  
+  /* Any data received will be stored "aRxBuffer" buffer : the number max of 
+     data received is RXBUFFERSIZE */
+  /* Enable RXNE and Error interrupts */  
+  LL_USART_EnableIT_RXNE(USARTx);
+  LL_USART_EnableIT_ERROR(USARTx);
+
+  /*##-3- Start the transmission process (using LL) *##########################*/  
+  /* While the UART in reception process, user can transmit data from 
+     "aTxStartMessage" buffer */
+  /* Start USART transmission : Will initiate TXE interrupt after TDR register is empty */
+  LL_USART_TransmitData8(USARTx, aTxStartMessage[uwTxIndex++]); 
+
+  /* Enable TXE interrupt */
+  LL_USART_EnableIT_TXE(USARTx); 
+
+  /*##-4- Wait for the end of the transfer ###################################*/
+  /* USART IRQ handler is not anymore routed to HAL_UART_IRQHandler() function 
+     and is now based on LL API functions use. 
+     Therefore, use of HAL IT based services is no more possible. */
+  /*  Once TX transfer is completed, LED2 will toggle.
+      Then, when RX transfer is completed, LED2 will turn On. */
+  while (ubTxComplete == 0)
+  {
+  }
+
+  while (ubRxComplete == 0)
+  {
+    // BSP_LED_Toggle(LED2);
+    HAL_Delay(250);
+  }
+
+  // BSP_LED_On(LED2); /* stop blink and keeps ON */
+
+  /*##-5- Send the received Buffer ###########################################*/
+  /* Even if use of HAL IT based services is no more possible, use of HAL Polling based services
+     (as Transmit in polling mode) is still possible. */
+  if(HAL_UART_Transmit(&UartHandle, (uint8_t*)aRxBuffer, RXBUFFERSIZE, 1000)!= HAL_OK)
+  {
+    /* Transfer error in transmission process */
+    Error_Handler();
+  }
+  
+  /*##-6- Send the End Message ###############################################*/  
+  if(HAL_UART_Transmit(&UartHandle, (uint8_t*)aTxEndMessage, TXENDMESSAGESIZE, 1000)!= HAL_OK)
+  {
+    /* Transfer error in transmission process */
+    Error_Handler();
   }
 
   /* Infinite loop */
@@ -114,29 +266,62 @@ int main(void)
 // System Clock Configuration
 void SystemClock_Config(void)
 {
+
+// #define USE_RCC_SYSCLKSOURCE_PLLCLK
+
+#ifdef USE_RCC_SYSCLKSOURCE_PLLCLK
+
+  /* MSI is enabled after System reset, activate PLL with MSI as source */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
+  RCC_OscInitStruct.MSIState = RCC_MSI_ON;
+  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
+  RCC_OscInitStruct.MSICalibrationValue = RCC_MSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_MSI;
+  RCC_OscInitStruct.PLL.PLLM = 1;
+  RCC_OscInitStruct.PLL.PLLN = 40;
+  RCC_OscInitStruct.PLL.PLLR = 2;
+  RCC_OscInitStruct.PLL.PLLP = 7;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
+  if(HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+    /* Initialization Error */
+    while(1);
+  }
+
+  /* Select PLL as system clock source and configure the HCLK, PCLK1 and PCLK2 
+     clocks dividers */
+  RCC_ClkInitStruct.ClockType = (RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2);
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;  
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;  
+  if(HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK) {
+    /* Initialization Error */
+    while(1);
+  }
+
+#else
+
   // Initializes the CPU, AHB and APB busses clocks
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  // RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-  // RCC_OscInitStruct.HSICalibrationValue = 16;
   RCC_OscInitStruct.HSICalibrationValue = 1;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
     Error_Handler();
   }
-  // Initializes the CPU, AHB and APB busses clocks
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-          |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  // RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_MSI;
+
+// Initializes the CPU, AHB and APB busses clocks
+  RCC_ClkInitStruct.ClockType = (RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2);
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
-  // RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSE;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  // RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK) {
     Error_Handler();
   }
+
+#endif
   
   // Configure the main internal regulator output voltage
   if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK) {
@@ -245,12 +430,12 @@ void UART_Error_Callback(void)
   if (isr_reg & LL_USART_ISR_NE)
   {
     /* Turn LED2 off: Transfer error in reception/transmission process */
-    BSP_LED_Off(LED2);
+    // BSP_LED_Off(LED2);
   }
   else
   {
     /* Turn LED2 off: Transfer error in reception/transmission process */
-    BSP_LED_Off(LED2);
+    // BSP_LED_Off(LED2);
   }
 }
 
