@@ -1,6 +1,5 @@
-aux_source_directory(${CMAKE_CURRENT_LIST_DIR}/Src hal_src)
+file(GLOB_RECURSE hal_src *.c)
 
-get_property(inc_dirs DIRECTORY PROPERTY INCLUDE_DIRECTORIES)
-include_directories(${inc_dirs})
+include_directories(Inc)
 
-add_library(stm32l4xx_hal OBJECT ${hal_src})
+add_library(stm32l4xx_hal ${hal_src})

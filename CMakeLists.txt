@@ -24,8 +24,7 @@ set(CMSIS_DIR ${CMAKE_SOURCE_DIR}/hal/cmsis)
 set(STM32L4XX_HAL ${CMAKE_SOURCE_DIR}/hal/stm32l4xx_hal/Inc)
 set(STM32L4XX_HAL_LEGACY ${STM32L4XX_HAL}/Legacy)
 set(SYSTEM_DIR ${CMAKE_SOURCE_DIR}/hal/system)
-set(APP_DIR ${CMAKE_SOURCE_DIR}/app)
-# set(BSP_DIR ${CMAKE_SOURCE_DIR}/hal/bsp)
+set(APP_DIR ${CMAKE_SOURCE_DIR}/app/Inc)
 
 include_directories(
   ${CMSIS_DIR}
@@ -40,6 +39,8 @@ add_subdirectory(app/)
 add_subdirectory(hal/)
 
 add_custom_command(OUTPUT arm_hello_world.flash
+  COMMAND st-flash --reset erase
+  COMMAND sleep 0.5
   COMMAND st-flash --reset write app/hello_world.bin 0x8000000
   WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
   DEPENDS hello_world

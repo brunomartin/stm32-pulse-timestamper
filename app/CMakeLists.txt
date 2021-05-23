@@ -1,7 +1,6 @@
-set(app_src main.c)
+file(GLOB_RECURSE app_src *.c)
 
-get_property(inc_dirs DIRECTORY PROPERTY INCLUDE_DIRECTORIES)
-include_directories(${inc_dirs})
+include_directories(Inc)
 
 set(STM32_OBJECTS $<TARGET_OBJECTS:startup> $<TARGET_OBJECTS:system> $<TARGET_OBJECTS:stm32l4xx_hal>)
 
