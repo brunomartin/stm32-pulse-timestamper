@@ -83,7 +83,7 @@ int main(void)
   /* Configure leds */
   BSP_LED_Init(LED2);
 
-// #define BLINK_BEFORE_UART
+#define BLINK_BEFORE_UART
 
 #ifdef BLINK_BEFORE_UART
 
@@ -129,6 +129,7 @@ int main(void)
     > stty 9600 -F /dev/ttyAMA0 parenb parodd cs7 -cstopb -crtscts
     > cat /dev/ttyAMA0
     > echo 1234567890 > /dev/ttyAMA0
+    > screen /dev/ttyAMA0 9600,cs7,parenb,parodd,-cstopb,-crtscts
       
   */
   UartHandle.Instance        = USARTx;
