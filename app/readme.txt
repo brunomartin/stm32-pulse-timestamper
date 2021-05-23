@@ -26,11 +26,11 @@ describes how to use the USART peripheral through the STM32L4xx UART HAL
 and LL API, the LL API being used for performance improvement.
 
 Board: NUCLEO-L476RG Rev C
-Tx Pin: PA.02
-Rx Pin: PA.03
+Tx Pin: PA.00
+Rx Pin: PA.01
    _________________________ 
   |           ______________|                       _______________
-  |          |USART2        |                      | HyperTerminal |
+  |          |UART4         |                      | HyperTerminal |
   |          |              |                      |               |
   |          |           TX |______________________|RX             |
   |          |              |                      |               |
@@ -86,7 +86,7 @@ The UART is configured as follows:
 
 @note USARTx/UARTx instance used and associated resources can be updated in "main.h"
       file depending hardware configuration used.
-      For example, current example is provided in a configuration based on Virtual Com Port use (USART2).
+      For example, current example is provided in a configuration based on Virtual Com Port use (UART4).
       Another USART instance could be used, assuming corresponding TX and RX pins are properly wired 
       to PC Com port (updates to be done accordinlgy in main.h).
 
@@ -125,7 +125,7 @@ The UART is configured as follows:
     Example is delivered for using Virtual Com port feature of STLINK for connection between NUCLEO-L476RG Rev C and PC,
     Please ensure that USART communication between the target MCU and ST-LINK MCU is properly enabled 
     on HW board in order to support Virtual Com Port (Default HW SB configuration allows use of VCP)
-    GPIOs connected to USART2 TX/RX (PA.02 and PA.03) are automatically mapped
+    GPIOs connected to UART4 TX/RX (PA.00 and PA.01) are automatically mapped
     on RX and TX pins of PC UART Com port selected on PC side (please ensure VCP com port is selected).
 
   - Launch serial communication SW on PC (as HyperTerminal or TeraTerm) with proper configuration 

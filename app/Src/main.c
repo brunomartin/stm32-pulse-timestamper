@@ -126,8 +126,9 @@ int main(void)
       - Hardware flow control disabled (RTS and CTS signals)
 
     To test it on a rpi4:
-    > stty -F /dev/ttyAMA0 9600 parenb parodd cs8 -cstopb -crtscts cread -echo -onlcr
+    > stty 9600 -F /dev/ttyAMA0 parenb parodd cs7 -cstopb -crtscts
     > cat /dev/ttyAMA0
+    > echo 1234567890 > /dev/ttyAMA0
       
   */
   UartHandle.Instance        = USARTx;
