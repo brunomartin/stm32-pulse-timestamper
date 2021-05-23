@@ -79,39 +79,41 @@ int main(void)
 
   /* Configure the system clock to 80 MHz */
   SystemClock_Config();
+  
+  /* Configure leds */
+  BSP_LED_Init(LED2);
 
-#define BLINK_BEFORE_UART
+// #define BLINK_BEFORE_UART
 
 #ifdef BLINK_BEFORE_UART
 
-  __HAL_RCC_GPIOA_CLK_ENABLE();
+  // __HAL_RCC_GPIOA_CLK_ENABLE();
 
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+  // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
 
-  GPIO_InitTypeDef GPIO_InitStruct;
-  GPIO_InitStruct.Pin = GPIO_PIN_5;
-  // GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  // GPIO_InitTypeDef GPIO_InitStruct;
+  // GPIO_InitStruct.Pin = GPIO_PIN_5;
+  // // GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  // GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  // GPIO_InitStruct.Pull = GPIO_NOPULL;
+  // GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
 
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  // HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   const uint32_t pulses = 1e5;
   uint32_t count = 0;
   double period_us = 20;
 
   for(count=0;count<pulses;count++) {
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+    // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+    BSP_LED_Off(LED2);
     HAL_Delay_us(period_us/2);
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+    // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+    BSP_LED_On(LED2);
     HAL_Delay_us(period_us/2);
   }
 
 #endif
-  
-  /* Configure leds */
-  BSP_LED_Init(LED2);
   
   /*##-1- Configure the UART peripheral using HAL services ###################*/
   /* Put the USART peripheral in the Asynchronous mode (UART Mode) */
@@ -124,7 +126,7 @@ int main(void)
       - Hardware flow control disabled (RTS and CTS signals)
 
     To test it on a rpi4:
-    > stty -F /dev/ttyAMA0 9600 cs8 -cstopb parenb parodd cread -crtscts -echo -icanon -onlcr inpck ignpar
+    > stty -F /dev/ttyAMA0 9600 parenb parodd cs8 -cstopb -crtscts cread -echo -onlcr
     > cat /dev/ttyAMA0
       
   */
