@@ -82,12 +82,6 @@ void HAL_Delay_us_DWT(uint32_t us) {
 		      );\
 } while(0)
 
-const uint32_t pulses = 1e5;
-uint32_t count = 0;
-double period_us = 20;
-
-uint32_t timer_val;
-
 /* Private functions ---------------------------------------------------------*/
 
 /**
@@ -123,6 +117,10 @@ int main(void)
   GPIO_InitStruct.Pin = GPIO_PIN_8;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
 
+  const uint32_t pulses = 1e5;
+  uint32_t count = 0;
+  double period_us = 20;
+
 // #define OUTPUT_PIN
 
 #ifdef OUTPUT_PIN // pin is an output
@@ -143,6 +141,9 @@ int main(void)
     // HAL_Delay_us_ASM(period_us/2);
   }
 
+  memset(aTxStartMessage, 0, ubSizeToSend);
+  sprintf(aTxStartMessage, "period_us: %0.2fus\n\r", period_us);
+
 #else // pin is an input
 
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
@@ -150,30 +151,47 @@ int main(void)
 
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  uint32_t start, last, current, elapsed;
+  uint32_t min=-1, max = 0;
+
   // Wait first pulse
   while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) != GPIO_PIN_SET) {};
   while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) != GPIO_PIN_RESET) {};
 
   HAL_TIM_Base_Start(&htim);
+  start = __HAL_TIM_GET_COUNTER(&htim);
+  last = start;
 
   for(count=1;count<pulses;count++) {
 
     while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) != GPIO_PIN_SET) {};
     while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) != GPIO_PIN_RESET) {};
 
-    timer_val = __HAL_TIM_GET_COUNTER(&htim);
+    current = __HAL_TIM_GET_COUNTER(&htim);
+
+    elapsed = current - last;
+
+    // Get min and max, does not take too many cycles
+    max = elapsed > max ? elapsed : max;
+    min = elapsed < min ? elapsed : min;
     
+    last = current;
+  }
+  
+  double mean = 0;
+  double total;
+
+  // Compute total and mean value is possible
+  total = current - start;
+  if(count > 1) {
+    mean = total/(count-1);
   }
 
-  timer_val = __HAL_TIM_GET_COUNTER(&htim);
-  // timer_val = get_time();
+  memset(aTxStartMessage, 0, ubSizeToSend);
+  sprintf(aTxStartMessage, "total: %0.2fs, mean: %0.2fus, min: %luus, max: %luus, rate: %0.2fkHz\n\r", total/1e6, mean, min, max, 1/mean*1e3);
 
 #endif
 
-  memset(aTxStartMessage, 0, ubSizeToSend);
-  sprintf(aTxStartMessage, "period_us: %0.2fus\n\r", period_us);
-  sprintf(aTxStartMessage, "timer_val: %lus\n\r", timer_val);
-  
   /*##-1- Configure the UART peripheral using HAL services ###################*/
   /* Put the USART peripheral in the Asynchronous mode (UART Mode) */
   /* UART configured as follows:
@@ -323,10 +341,9 @@ static void Timer_Config(void)
 {
 
   /* Compute the prescaler value to have TIMx counter clock equal to 1MHz */
-    uwPrescalerValue = (uint32_t)(SystemCoreClock / 1e6) - 1;
 
     htim.Instance               = TIMx;
-    htim.Init.Prescaler         = uwPrescalerValue;
+    htim.Init.Prescaler         = (uint32_t)(SystemCoreClock / 1e6) - 1;
     htim.Init.CounterMode       = TIM_COUNTERMODE_UP;
     htim.Init.Period            = 0xFFFFFFFF;
     htim.Init.ClockDivision     = TIM_CLOCKDIVISION_DIV1;
