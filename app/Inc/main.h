@@ -28,6 +28,8 @@
 #include "stm32l4xx_hal.h"
 #include "stm32l4xx_nucleo.h"
 
+#include "stm32l4xx_hal_tim.h"
+
 #include "stm32l4xx_ll_bus.h"
 #include "stm32l4xx_ll_rcc.h"
 #include "stm32l4xx_ll_system.h"

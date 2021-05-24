@@ -8,13 +8,12 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 # CPU architecture specific flags
 set(CPU_FLAGS "-mthumb -mcpu=cortex-m4")
-# set(CPU_FLAGS "${CPU_FLAGS} -specs=nano.specs -specs=nosys.specs")
 
 # enable hard Cortex-M4 Hard FP
-# set(GCC_FLAGS "${GCC_FLAGS} -mfloat-abi=hard -mfpu=fpv4-sp-d16")
+set(GCC_FLAGS "${GCC_FLAGS} -mfloat-abi=hard -mfpu=fpv4-sp-d16")
 
 # enable hard Cortex-M4 Soft FP
-set(GCC_FLAGS "${GCC_FLAGS} -mfloat-abi=softfp -mfpu=fpv4-sp-d16")
+# set(GCC_FLAGS "${GCC_FLAGS} -mfloat-abi=softfp -mfpu=fpv4-sp-d16")
 
 set(GCC_FLAGS "-ffunction-sections -fdata-sections -fmessage-length=0 -fsigned-char -fshort-enums")
 

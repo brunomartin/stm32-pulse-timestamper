@@ -36,6 +36,10 @@
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
+
+/* Timer declaration */
+TIM_HandleTypeDef htim = {0};
+
 /* UART handler declaration */
 UART_HandleTypeDef UartHandle;
 __IO uint8_t  ubTxComplete = 0;
@@ -53,6 +57,7 @@ __IO uint32_t uwRxIndex = 0;
 
 /* Private function prototypes -----------------------------------------------*/
 static void SystemClock_Config(void);
+static void Timer_Config(void);
 static void Error_Handler(void);
 
 static void HAL_Delay_us(uint32_t ticks);
@@ -80,6 +85,8 @@ const uint32_t pulses = 1e5;
 uint32_t count = 0;
 double period_us = 20;
 
+int timer_val;
+
 /* Private functions ---------------------------------------------------------*/
 
 /**
@@ -102,6 +109,9 @@ int main(void)
 
   /* Configure the system clock to 80 MHz */
   SystemClock_Config();
+
+  /* Configure timer */
+  Timer_Config();
   
   /* Configure leds */
   BSP_LED_Init(LED2);
@@ -112,7 +122,7 @@ int main(void)
   GPIO_InitStruct.Pin = GPIO_PIN_8;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
 
-#define OUTPUT_PIN
+// #define OUTPUT_PIN
 
 #ifdef OUTPUT_PIN // pin is an output
 
@@ -132,9 +142,6 @@ int main(void)
     // HAL_Delay_us_ASM(period_us/2);
   }
 
-  memset(aTxStartMessage, 0, ubSizeToSend);
-  sprintf(aTxStartMessage, "period_us: %0.2fus\n\r", period_us);
-
 #else // pin is an input
 
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
@@ -142,14 +149,26 @@ int main(void)
 
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  for(count=0;count<pulses;count++) {
+  // Wait first pulse
+  while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) != GPIO_PIN_SET) {};
+  while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) != GPIO_PIN_RESET) {};
+
+  HAL_TIM_Base_Start(&htim);
+
+  for(count=1;count<pulses;count++) {
 
     while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) != GPIO_PIN_SET) {};
     while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) != GPIO_PIN_RESET) {};
     
   }
 
+  timer_val = __HAL_TIM_GET_COUNTER(&htim);
+
 #endif
+
+  memset(aTxStartMessage, 0, ubSizeToSend);
+  // sprintf(aTxStartMessage, "period_us: %0.2fus\n\r", period_us);
+  sprintf(aTxStartMessage, "timer_val: %ds\n\r", timer_val);
   
   /*##-1- Configure the UART peripheral using HAL services ###################*/
   /* Put the USART peripheral in the Asynchronous mode (UART Mode) */
@@ -294,6 +313,22 @@ void SystemClock_Config(void)
     /* Initialization Error */
     while(1);
   }
+}
+
+static void Timer_Config(void)
+{
+    htim.Instance               = TIM2;
+    htim.Init.Prescaler         = 0x0000;
+    htim.Init.CounterMode       = TIM_COUNTERMODE_UP;
+    htim.Init.Period            = 0xFFFFFFFF;
+    htim.Init.ClockDivision     = TIM_CLOCKDIVISION_DIV1;
+    htim.Init.RepetitionCounter = 0x0;
+
+    /* Auto-reload register preload is disabled */
+    htim.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+
+    /* Configure timer time base */
+    HAL_TIM_Base_Init(&htim);
 }
 
 /**
