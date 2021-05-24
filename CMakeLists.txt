@@ -8,14 +8,30 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 # CPU architecture specific flags
 set(CPU_FLAGS "-mthumb -mcpu=cortex-m4")
+# set(CPU_FLAGS "${CPU_FLAGS} -specs=nano.specs -specs=nosys.specs")
+
+# enable hard Cortex-M4 Hard FP
+# set(GCC_FLAGS "${GCC_FLAGS} -mfloat-abi=hard -mfpu=fpv4-sp-d16")
+
+# enable hard Cortex-M4 Soft FP
+set(GCC_FLAGS "${GCC_FLAGS} -mfloat-abi=softfp -mfpu=fpv4-sp-d16")
+
 set(GCC_FLAGS "-ffunction-sections -fdata-sections -fmessage-length=0 -fsigned-char -fshort-enums")
+
 set(STM32L4_LD_SCRIPT "${CMAKE_SOURCE_DIR}/hal/system/armgcc/STM32L476RGTx_FLASH.ld")
-set(CMAKE_EXE_LINKER_FLAGS "--specs=nano.specs -Xlinker --gc-sections")
+
+set(CMAKE_EXE_LINKER_FLAGS "-Xlinker --gc-sections")
+
+# to define unless : undefined reference to `_sbrk'
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -specs=nano.specs -specs=nosys.specs")
+
+# to enable printf for float format
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -u _printf_float")
 
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${CPU_FLAGS} -T\"${STM32L4_LD_SCRIPT}\"")
 
 # CPU defs
-add_definitions(${CPU_FLAGS} ${GCC_FLAGS} --specs=nano.specs)
+add_definitions(${CPU_FLAGS} ${GCC_FLAGS})
 # System defs
 add_definitions(-DSTM32L476xx)
 add_definitions(-DUSE_STM32L4XX_NUCLEO)

@@ -57,6 +57,29 @@ static void Error_Handler(void);
 
 static void HAL_Delay_us(uint32_t ticks);
 
+#pragma GCC push_options
+#pragma GCC optimize ("O3")
+void HAL_Delay_us_DWT(uint32_t us) {
+	volatile uint32_t cycles = (SystemCoreClock/1000000L)*us;
+	volatile uint32_t start = DWT->CYCCNT;
+	do  {
+	} while(DWT->CYCCNT - start < cycles);
+}
+#pragma GCC pop_options
+
+#define HAL_Delay_us_ASM(us) do {\
+	asm volatile (	"MOV R0,%[loops]\n\t"\
+			"1: \n\t"\
+			"SUB R0, #1\n\t"\
+			"CMP R0, #0\n\t"\
+			"BNE 1b \n\t" : : [loops] "r" (1*us) : "memory"\
+		      );\
+} while(0)
+
+const uint32_t pulses = 1e5;
+uint32_t count = 0;
+double period_us = 20;
+
 /* Private functions ---------------------------------------------------------*/
 
 /**
@@ -83,34 +106,47 @@ int main(void)
   /* Configure leds */
   BSP_LED_Init(LED2);
 
-#define BLINK_BEFORE_UART
+  __HAL_RCC_GPIOA_CLK_ENABLE();
 
-#ifdef BLINK_BEFORE_UART
+  GPIO_InitTypeDef GPIO_InitStruct;
+  GPIO_InitStruct.Pin = GPIO_PIN_8;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
 
-  // __HAL_RCC_GPIOA_CLK_ENABLE();
+#define OUTPUT_PIN
 
-  // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+#ifdef OUTPUT_PIN // pin is an output
 
-  // GPIO_InitTypeDef GPIO_InitStruct;
-  // GPIO_InitStruct.Pin = GPIO_PIN_5;
-  // // GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  // GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
-  // GPIO_InitStruct.Pull = GPIO_NOPULL;
-  // GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
 
-  // HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  const uint32_t pulses = 1e5;
-  uint32_t count = 0;
-  double period_us = 20;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   for(count=0;count<pulses;count++) {
-    // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
-    BSP_LED_Off(LED2);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
     HAL_Delay_us(period_us/2);
-    // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-    BSP_LED_On(LED2);
+    // HAL_Delay_us_DWT(period_us/2);
+    // HAL_Delay_us_ASM(period_us/2);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
     HAL_Delay_us(period_us/2);
+    // HAL_Delay_us_DWT(period_us/2);
+    // HAL_Delay_us_ASM(period_us/2);
+  }
+
+  memset(aTxStartMessage, 0, ubSizeToSend);
+  sprintf(aTxStartMessage, "period_us: %0.2fus\n\r", period_us);
+
+#else // pin is an input
+
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  for(count=0;count<pulses;count++) {
+
+    while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) != GPIO_PIN_SET) {};
+    while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) != GPIO_PIN_RESET) {};
+    
   }
 
 #endif
