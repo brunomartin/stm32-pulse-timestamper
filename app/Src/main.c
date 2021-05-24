@@ -39,6 +39,7 @@
 
 /* Timer declaration */
 TIM_HandleTypeDef htim = {0};
+uint32_t uwPrescalerValue;
 
 /* UART handler declaration */
 UART_HandleTypeDef UartHandle;
@@ -85,7 +86,7 @@ const uint32_t pulses = 1e5;
 uint32_t count = 0;
 double period_us = 20;
 
-int timer_val;
+uint32_t timer_val;
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -159,16 +160,19 @@ int main(void)
 
     while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) != GPIO_PIN_SET) {};
     while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) != GPIO_PIN_RESET) {};
+
+    timer_val = __HAL_TIM_GET_COUNTER(&htim);
     
   }
 
   timer_val = __HAL_TIM_GET_COUNTER(&htim);
+  // timer_val = get_time();
 
 #endif
 
   memset(aTxStartMessage, 0, ubSizeToSend);
-  // sprintf(aTxStartMessage, "period_us: %0.2fus\n\r", period_us);
-  sprintf(aTxStartMessage, "timer_val: %ds\n\r", timer_val);
+  sprintf(aTxStartMessage, "period_us: %0.2fus\n\r", period_us);
+  sprintf(aTxStartMessage, "timer_val: %lus\n\r", timer_val);
   
   /*##-1- Configure the UART peripheral using HAL services ###################*/
   /* Put the USART peripheral in the Asynchronous mode (UART Mode) */
@@ -317,8 +321,12 @@ void SystemClock_Config(void)
 
 static void Timer_Config(void)
 {
-    htim.Instance               = TIM2;
-    htim.Init.Prescaler         = 0x0000;
+
+  /* Compute the prescaler value to have TIMx counter clock equal to 1MHz */
+    uwPrescalerValue = (uint32_t)(SystemCoreClock / 1e6) - 1;
+
+    htim.Instance               = TIMx;
+    htim.Init.Prescaler         = uwPrescalerValue;
     htim.Init.CounterMode       = TIM_COUNTERMODE_UP;
     htim.Init.Period            = 0xFFFFFFFF;
     htim.Init.ClockDivision     = TIM_CLOCKDIVISION_DIV1;
@@ -328,7 +336,11 @@ static void Timer_Config(void)
     htim.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
 
     /* Configure timer time base */
-    HAL_TIM_Base_Init(&htim);
+  if (HAL_TIM_Base_Init(&htim) != HAL_OK) {
+    /* Initialization Error */
+    Error_Handler();
+  }
+
 }
 
 /**

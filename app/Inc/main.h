@@ -24,6 +24,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include <stdio.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include "stm32l4xx_hal.h"
 #include "stm32l4xx_nucleo.h"
@@ -77,7 +78,15 @@
 void UART_CharReception_Callback(void); 
 void UART_TXEmpty_Callback(void); 
 void UART_CharTransmitComplete_Callback(void); 
-void UART_Error_Callback(void); 
+void UART_Error_Callback(void);
+
+/* Definition for TIMx clock resources */
+#define TIMx                           TIM2
+#define TIMx_CLK_ENABLE()              __HAL_RCC_TIM2_CLK_ENABLE()
+
+/* Definition for TIMx's NVIC */
+#define TIMx_IRQn                      TIM2_IRQn
+#define TIMx_IRQHandler                TIM2_IRQHandler
 
 #endif /* __MAIN_H */
 
