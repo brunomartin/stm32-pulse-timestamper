@@ -17,7 +17,7 @@ set(GCC_FLAGS "${GCC_FLAGS} -mfloat-abi=hard -mfpu=fpv4-sp-d16")
 
 set(GCC_FLAGS "-ffunction-sections -fdata-sections -fmessage-length=0 -fsigned-char -fshort-enums")
 
-set(STM32L4_LD_SCRIPT "${CMAKE_SOURCE_DIR}/hal/system/armgcc/STM32L476RGTx_FLASH.ld")
+set(STM32L4_LD_SCRIPT "${CMAKE_SOURCE_DIR}/Drivers/BSP/STM32L476RGTx_FLASH.ld")
 
 set(CMAKE_EXE_LINKER_FLAGS "-Xlinker --gc-sections")
 
@@ -35,32 +35,37 @@ add_definitions(${CPU_FLAGS} ${GCC_FLAGS})
 add_definitions(-DSTM32L476xx)
 add_definitions(-DUSE_STM32L4XX_NUCLEO)
 
-set(CMSIS_DIR ${CMAKE_SOURCE_DIR}/hal/cmsis)
-set(STM32L4XX_HAL ${CMAKE_SOURCE_DIR}/hal/stm32l4xx_hal/Inc)
-set(STM32L4XX_HAL_LEGACY ${STM32L4XX_HAL}/Legacy)
-set(SYSTEM_DIR ${CMAKE_SOURCE_DIR}/hal/system)
-set(APP_DIR ${CMAKE_SOURCE_DIR}/app/Inc)
+set(TARGET pulse_read_main)
+# set(TARGET pulse_read_irq)
+
+MESSAGE(Target to build: ${TARGET})
+
+set(CMSIS_DIR ${CMAKE_SOURCE_DIR}/Drivers/CMSIS)
+set(STM32_HAL_DIR ${CMAKE_SOURCE_DIR}/Drivers/STM32L4xx_HAL_Driver)
+set(BSP_DIR ${CMAKE_SOURCE_DIR}/Drivers/BSP)
 
 include_directories(
-  ${CMSIS_DIR}
-  ${STM32L4XX_HAL}
-  ${STM32L4XX_HAL_LEGACY}
-  ${SYSTEM_DIR}
-  ${APP_DIR}
+  ${CMSIS_DIR}/Core/Include
+  ${CMSIS_DIR}/Device/Include
+  ${STM32_HAL_DIR}/Inc
+  ${STM32_HAL_DIR}/Inc/Legacy
   ${BSP_DIR}
+  ${CMAKE_SOURCE_DIR}/apps/${TARGET}/Inc
 )
 
-add_subdirectory(app/)
-add_subdirectory(hal/)
+set(TARGET_BIN apps/${TARGET}.bin)
 
-add_custom_command(OUTPUT arm_hello_world.flash
+add_subdirectory(apps)
+add_subdirectory(Drivers)
+
+add_custom_command(OUTPUT arm_${TARGET}.flash
   COMMAND st-flash --reset erase
   COMMAND sleep 0.5
-  COMMAND st-flash --reset write app/hello_world.bin 0x8000000
+  COMMAND st-flash --reset write ${TARGET_BIN} 0x8000000
   WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-  DEPENDS hello_world
-  COMMENT "flashing app/arm_hello_world.bin..."
+  DEPENDS ${TARGET}
+  COMMENT "flashing ${TARGET_BIN}..."
   VERBATIM
 )
 
-add_custom_target(flash DEPENDS arm_hello_world.flash)
+add_custom_target(flash DEPENDS arm_${TARGET}.flash)

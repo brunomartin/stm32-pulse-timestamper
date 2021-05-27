@@ -79,7 +79,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart)
     
   /*##-3- Configure the NVIC for UART ########################################*/   
   /* NVIC for USARTx */
-  HAL_NVIC_SetPriority(USARTx_IRQn, 0, 1);
+  HAL_NVIC_SetPriority(USARTx_IRQn, 1, 0);
   HAL_NVIC_EnableIRQ(USARTx_IRQn);
 }
 
@@ -123,7 +123,7 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef *htim)
   
   /*##-2- Configure the NVIC for TIMx ########################################*/
   /* Set the TIMx priority */
-  HAL_NVIC_SetPriority(TIMx_IRQn, 3, 0);
+  HAL_NVIC_SetPriority(TIMx_IRQn, 0, 0);
 
   /* Enable the TIMx global Interrupt */
   HAL_NVIC_EnableIRQ(TIMx_IRQn);

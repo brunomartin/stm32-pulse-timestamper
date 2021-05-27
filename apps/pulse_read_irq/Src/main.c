@@ -111,13 +111,53 @@ int main(void)
   /* Configure leds */
   BSP_LED_Init(LED2);
 
+  /*##-1- Configure the UART peripheral using HAL services ###################*/
+  /* Put the USART peripheral in the Asynchronous mode (UART Mode) */
+  /* UART configured as follows:
+      - Word Length = 8 Bits (7 data bit + 1 parity bit) : 
+	                  BE CAREFUL : Program 7 data bits + 1 parity bit in PC HyperTerminal
+      - Stop Bit    = One Stop bit
+      - Parity      = ODD parity
+      - BaudRate    = 9600 baud
+      - Hardware flow control disabled (RTS and CTS signals)
+
+    To test it on a rpi4:
+    > stty 9600 -F /dev/ttyAMA0 parenb parodd cs7 -cstopb -crtscts
+    > cat /dev/ttyAMA0
+    > echo 1234567890 > /dev/ttyAMA0
+    > screen /dev/ttyAMA0 9600,cs7,parenb,parodd,-cstopb,-crtscts
+      
+  */
+  UartHandle.Instance        = USARTx;
+
+  UartHandle.Init.BaudRate   = 9600;
+  UartHandle.Init.WordLength = UART_WORDLENGTH_8B;
+  UartHandle.Init.StopBits   = UART_STOPBITS_1;
+  UartHandle.Init.Parity     = UART_PARITY_ODD;
+  UartHandle.Init.HwFlowCtl  = UART_HWCONTROL_NONE;
+  UartHandle.Init.Mode       = UART_MODE_TX_RX;
+  UartHandle.Init.OverSampling = UART_OVERSAMPLING_16;
+
+  if(HAL_UART_Init(&UartHandle) != HAL_OK)
+  {
+    /* Initialization Error */
+    Error_Handler();
+  }
+
+  /*##-2- Configure UART peripheral for reception process (using LL) ##########*/  
+  /* Any data received will be stored "aRxBuffer" buffer : the number max of 
+     data received is RXBUFFERSIZE */
+  /* Enable RXNE and Error interrupts */  
+  LL_USART_EnableIT_RXNE(USARTx);
+  LL_USART_EnableIT_ERROR(USARTx);
+
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   GPIO_InitTypeDef GPIO_InitStruct;
   GPIO_InitStruct.Pin = GPIO_PIN_8;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
 
-  const uint32_t pulses = 1e5;
+  const uint32_t pulses = 1e6;
   uint32_t count = 0;
   double period_us = 20;
 
@@ -191,46 +231,6 @@ int main(void)
   sprintf(aTxStartMessage, "total: %0.2fs, mean: %0.2fus, min: %luus, max: %luus, rate: %0.2fkHz\n\r", total/1e6, mean, min, max, 1/mean*1e3);
 
 #endif
-
-  /*##-1- Configure the UART peripheral using HAL services ###################*/
-  /* Put the USART peripheral in the Asynchronous mode (UART Mode) */
-  /* UART configured as follows:
-      - Word Length = 8 Bits (7 data bit + 1 parity bit) : 
-	                  BE CAREFUL : Program 7 data bits + 1 parity bit in PC HyperTerminal
-      - Stop Bit    = One Stop bit
-      - Parity      = ODD parity
-      - BaudRate    = 9600 baud
-      - Hardware flow control disabled (RTS and CTS signals)
-
-    To test it on a rpi4:
-    > stty 9600 -F /dev/ttyAMA0 parenb parodd cs7 -cstopb -crtscts
-    > cat /dev/ttyAMA0
-    > echo 1234567890 > /dev/ttyAMA0
-    > screen /dev/ttyAMA0 9600,cs7,parenb,parodd,-cstopb,-crtscts
-      
-  */
-  UartHandle.Instance        = USARTx;
-
-  UartHandle.Init.BaudRate   = 9600;
-  UartHandle.Init.WordLength = UART_WORDLENGTH_8B;
-  UartHandle.Init.StopBits   = UART_STOPBITS_1;
-  UartHandle.Init.Parity     = UART_PARITY_ODD;
-  UartHandle.Init.HwFlowCtl  = UART_HWCONTROL_NONE;
-  UartHandle.Init.Mode       = UART_MODE_TX_RX;
-  UartHandle.Init.OverSampling = UART_OVERSAMPLING_16;
-
-  if(HAL_UART_Init(&UartHandle) != HAL_OK)
-  {
-    /* Initialization Error */
-    Error_Handler();
-  }
-
-  /*##-2- Configure UART peripheral for reception process (using LL) ##########*/  
-  /* Any data received will be stored "aRxBuffer" buffer : the number max of 
-     data received is RXBUFFERSIZE */
-  /* Enable RXNE and Error interrupts */  
-  LL_USART_EnableIT_RXNE(USARTx);
-  LL_USART_EnableIT_ERROR(USARTx);
 
   /*##-3- Start the transmission process (using LL) *##########################*/  
   /* While the UART in reception process, user can transmit data from 
@@ -346,6 +346,7 @@ static void Timer_Config(void)
     htim.Init.Prescaler         = (uint32_t)(SystemCoreClock / 1e6) - 1;
     htim.Init.CounterMode       = TIM_COUNTERMODE_UP;
     htim.Init.Period            = 0xFFFFFFFF;
+    // htim.Init.Period            = 100000;
     htim.Init.ClockDivision     = TIM_CLOCKDIVISION_DIV1;
     htim.Init.RepetitionCounter = 0x0;
 
@@ -358,6 +359,24 @@ static void Timer_Config(void)
     Error_Handler();
   }
 
+  /*##-2- Start the TIM Base generation in interrupt mode ####################*/
+  /* Start Channel1 */
+  if (HAL_TIM_Base_Start_IT(&htim) != HAL_OK)
+  {
+    /* Starting Error */
+    Error_Handler();
+  }
+
+}
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  // Do something
 }
 
 /**
