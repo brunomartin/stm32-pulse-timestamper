@@ -201,6 +201,16 @@ void TIMx_IRQHandler(void)
 }
 
 /**
+  * @brief  This function handles external lines 10 to 15 interrupt request.
+  * @param  None
+  * @retval None
+  */
+void EXTI15_10_IRQHandler(void)
+{
+  HAL_GPIO_EXTI_IRQHandler(USER_BUTTON_PIN);
+}
+
+/**
   * @}
   */
 

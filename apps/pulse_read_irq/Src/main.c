@@ -61,6 +61,8 @@ static void SystemClock_Config(void);
 static void Timer_Config(void);
 static void Error_Handler(void);
 
+static void EXTI15_10_IRQHandler_Config(void);
+
 static void HAL_Delay_us(uint32_t ticks);
 
 #pragma GCC push_options
@@ -107,6 +109,9 @@ int main(void)
 
   /* Configure timer */
   Timer_Config();
+
+  /* Configure External line 13 (connected to PC.13 pin) in interrupt mode */
+  EXTI15_10_IRQHandler_Config();
   
   /* Configure leds */
   BSP_LED_Init(LED2);
@@ -150,87 +155,6 @@ int main(void)
   /* Enable RXNE and Error interrupts */  
   LL_USART_EnableIT_RXNE(USARTx);
   LL_USART_EnableIT_ERROR(USARTx);
-
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-
-  GPIO_InitTypeDef GPIO_InitStruct;
-  GPIO_InitStruct.Pin = GPIO_PIN_8;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-
-  const uint32_t pulses = 1e6;
-  uint32_t count = 0;
-  double period_us = 20;
-
-// #define OUTPUT_PIN
-
-#ifdef OUTPUT_PIN // pin is an output
-
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  for(count=0;count<pulses;count++) {
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
-    HAL_Delay_us(period_us/2);
-    // HAL_Delay_us_DWT(period_us/2);
-    // HAL_Delay_us_ASM(period_us/2);
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
-    HAL_Delay_us(period_us/2);
-    // HAL_Delay_us_DWT(period_us/2);
-    // HAL_Delay_us_ASM(period_us/2);
-  }
-
-  memset(aTxStartMessage, 0, ubSizeToSend);
-  sprintf(aTxStartMessage, "period_us: %0.2fus\n\r", period_us);
-
-#else // pin is an input
-
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  uint32_t start, last, current, elapsed;
-  uint32_t min=-1, max = 0;
-
-  // Wait first pulse
-  while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) != GPIO_PIN_SET) {};
-  while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) != GPIO_PIN_RESET) {};
-
-  HAL_TIM_Base_Start(&htim);
-  start = __HAL_TIM_GET_COUNTER(&htim);
-  last = start;
-
-  for(count=1;count<pulses;count++) {
-
-    while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) != GPIO_PIN_SET) {};
-    while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) != GPIO_PIN_RESET) {};
-
-    current = __HAL_TIM_GET_COUNTER(&htim);
-
-    elapsed = current - last;
-
-    // Get min and max, does not take too many cycles
-    max = elapsed > max ? elapsed : max;
-    min = elapsed < min ? elapsed : min;
-    
-    last = current;
-  }
-  
-  double mean = 0;
-  double total;
-
-  // Compute total and mean value is possible
-  total = current - start;
-  if(count > 1) {
-    mean = total/(count-1);
-  }
-
-  memset(aTxStartMessage, 0, ubSizeToSend);
-  sprintf(aTxStartMessage, "total: %0.2fs, mean: %0.2fus, min: %luus, max: %luus, rate: %0.2fkHz\n\r", total/1e6, mean, min, max, 1/mean*1e3);
-
-#endif
 
   /*##-3- Start the transmission process (using LL) *##########################*/  
   /* While the UART in reception process, user can transmit data from 
@@ -491,6 +415,44 @@ void UART_Error_Callback(void)
     BSP_LED_Off(LED2);
   }
 }
+
+/**
+  * @brief  Configures EXTI lines 10 to 15 (connected to PC.13 pin) in interrupt mode
+  * @param  None
+  * @retval None
+  */
+static void EXTI15_10_IRQHandler_Config(void)
+{
+  GPIO_InitTypeDef   GPIO_InitStructure;
+
+  /* Enable GPIOC clock */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+
+  /* Configure PC.13 pin as input floating */
+  GPIO_InitStructure.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStructure.Pull = GPIO_NOPULL;
+  GPIO_InitStructure.Pin = GPIO_PIN_13;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+  /* Enable and set EXTI lines 10 to 15 Interrupt to the lowest priority */
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 2, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+}
+
+/**
+  * @brief EXTI line detection callbacks
+  * @param GPIO_Pin: Specifies the pins connected EXTI line
+  * @retval None
+  */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  if (GPIO_Pin == GPIO_PIN_13)
+  {
+    /* Toggle LED2 */
+    BSP_LED_Toggle(LED2);
+  }
+}
+
 
 #ifdef  USE_FULL_ASSERT
 /**
