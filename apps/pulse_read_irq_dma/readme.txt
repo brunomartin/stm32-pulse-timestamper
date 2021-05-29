@@ -146,4 +146,4 @@ In order to make the program work, you must do the following :
  * <h3><center>&copy; COPYRIGHT STMicroelectronics</center></h3>
  */
 
-Detect pulses via gpio irq and send uart data via dma, max measured is 100kHz !!!
+Detect pulses via gpio irq and send uart data via dma, max measured is 100kHz over 1000s of measurement with an arduino micro as generator !!!
