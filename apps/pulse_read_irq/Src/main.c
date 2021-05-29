@@ -159,9 +159,6 @@ int main(void)
 
   uint32_t pulses_to_detect = 1e6;
   pulses_to_detect = 1e5;
-  // pulses_to_detect = timestamps_size/2;
-  // pulses_to_detect = 5000;
-  // pulses_to_detect = 0;
   int pulses_step_size = timestamps_size/2;
 
   struct Statistics stats;
@@ -170,6 +167,7 @@ int main(void)
   uint32_t* step_timestamps = timestamps;
 
   int send_id = 0;
+  uint32_t total_stats_count = 0;
 
   /* Wait all pulses have been detected */
   while (detected_pulses < pulses_to_detect) {
@@ -182,6 +180,8 @@ int main(void)
 
     // Compute statistics
     ComputeStats(step_timestamps, pulses_step_size, &stats);
+
+    total_stats_count += stats.count;
 
     pulses_last_step = pulses_next_step;
     pulses_next_step += pulses_step_size;
@@ -215,6 +215,31 @@ int main(void)
 
     ubTxComplete = 0;
 
+  }
+
+  // Initialize message to send
+  memset(aTxStartMessage, 0, ubSizeToSend);
+  
+  // Transmit results on serial link
+  sprintf(aTxStartMessage, "total_stats_count: %lu\n\r", total_stats_count);
+
+  /*##-3- Start the transmission process (using LL) *##########################*/  
+  /* While the UART in reception process, user can transmit data from 
+    "aTxStartMessage" buffer */
+  /* Start USART transmission : Will initiate TXE interrupt after TDR register is empty */
+  LL_USART_TransmitData8(USARTx, aTxStartMessage[uwTxIndex++]); 
+
+  /* Enable TXE interrupt */
+  LL_USART_EnableIT_TXE(USARTx); 
+
+  /*##-4- Wait for the end of the transfer ###################################*/
+  /* USART IRQ handler is not anymore routed to HAL_UART_IRQHandler() function 
+    and is now based on LL API functions use. 
+    Therefore, use of HAL IT based services is no more possible. */
+  /*  Once TX transfer is completed, LED2 will toggle.
+      Then, when RX transfer is completed, LED2 will turn On. */
+  while (ubTxComplete == 0)
+  {
   }
 
   while (ubRxComplete == 0)
