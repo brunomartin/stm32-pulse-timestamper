@@ -223,15 +223,8 @@ int main(void)
     {
       Error_Handler();
     }
-    
-    /*##-4- Wait for the end of the transfer ###################################*/
-    while (UartReady != SET)
-    {
-    }
 
-    /* Reset transmission flag */
-    UartReady = RESET;
-
+    // Don't wait for transmission unless we lost some data
   }
 
   // Initialize message to send
