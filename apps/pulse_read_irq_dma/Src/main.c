@@ -180,6 +180,7 @@ int main(void)
 
   uint32_t pulses_to_detect = 1e6;
   pulses_to_detect = 1e5;
+  // pulses_to_detect = 0;
   int pulses_step_size = timestamps_size/2;
 
   struct Statistics stats;
