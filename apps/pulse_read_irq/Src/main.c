@@ -69,26 +69,19 @@ __IO uint32_t  detected_pulses = 0;
 const uint32_t timestamps_size = 20000;
 uint32_t* timestamps;
 
+struct Statistics {
+  uint32_t count;
+  double total;
+  double mean;
+  double std_dev;
+  uint32_t min;
+  uint32_t max;
+};
+
+static void ComputeStats(const uint32_t* timestamps,
+  uint32_t size, struct Statistics* stats);
+
 static void HAL_Delay_us(uint32_t ticks);
-
-#pragma GCC push_options
-#pragma GCC optimize ("O3")
-void HAL_Delay_us_DWT(uint32_t us) {
-	volatile uint32_t cycles = (SystemCoreClock/1000000L)*us;
-	volatile uint32_t start = DWT->CYCCNT;
-	do  {
-	} while(DWT->CYCCNT - start < cycles);
-}
-#pragma GCC pop_options
-
-#define HAL_Delay_us_ASM(us) do {\
-	asm volatile (	"MOV R0,%[loops]\n\t"\
-			"1: \n\t"\
-			"SUB R0, #1\n\t"\
-			"CMP R0, #0\n\t"\
-			"BNE 1b \n\t" : : [loops] "r" (1*us) : "memory"\
-		      );\
-} while(0)
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -164,27 +157,11 @@ int main(void)
   }
 
   // Compute statistics
-  double total = timestamps[timestamps_size-1] - timestamps[0];
-  
-  double mean = total/(timestamps_size-1);
-
-  double std_dev = 0, elapsed;
-  for(int i=1;i<timestamps_size;i++) {
-    elapsed = timestamps[i] - timestamps[i-1];
-    std_dev += (elapsed-mean)*(elapsed-mean);
-  }
-  std_dev = sqrt(std_dev/(timestamps_size-1));
-
-  uint32_t min = -1, max = 0;
-  for(int i=1;i<timestamps_size;i++) {
-    // Get min and max, does not take too many cycles
-    elapsed = timestamps[i] - timestamps[i-1];
-    max = elapsed > max ? elapsed : max;
-    min = elapsed < min ? elapsed : min;
-  }
+  struct Statistics stats;
+  ComputeStats(timestamps, timestamps_size, &stats);
 
   memset(aTxStartMessage, 0, ubSizeToSend);
-  sprintf(aTxStartMessage, "total: %0.2fs, mean: %0.2fus, std: %0.2fus, min: %luus, max: %luus, rate: %0.2fkHz\n\r", total/1e6, mean, std_dev, min, max, 1/mean*1e3);
+  sprintf(aTxStartMessage, "total: %0.2fs, mean: %0.2fus, std: %0.2fus, min: %luus, max: %luus, rate: %0.2fkHz\n\r", stats.total/1e6, stats.mean, stats.std_dev, stats.min, stats.max, 1/stats.mean*1e3);
 
   /*##-2- Configure UART peripheral for reception process (using LL) ##########*/  
   /* Any data received will be stored "aRxBuffer" buffer : the number max of 
@@ -353,6 +330,42 @@ static void Error_Handler(void)
   }
 }
 
+/**
+  * @brief  This function computes statistics from a vector of timestamps.
+  * @param  timestamps : vector of timestamps in uint32_t (in)
+  * @param  size : size of timestamp vector in uint32_t (in)
+  * @param  stats : computed statistics as a Statistics structure (out)
+  * @retval None
+  */
+static void ComputeStats(const uint32_t* timestamps, uint32_t size, struct Statistics* stats) {
+  stats->count = size;
+
+  stats->total = timestamps[timestamps_size-1] - timestamps[0];
+  
+  stats->mean = stats->total/(timestamps_size-1);
+
+  stats->std_dev = 0;
+  double elapsed;
+  for(int i=1;i<timestamps_size;i++) {
+    elapsed = timestamps[i] - timestamps[i-1];
+    stats->std_dev += (elapsed-stats->mean)*(elapsed-stats->mean);
+  }
+  stats->std_dev = sqrt(stats->std_dev/(timestamps_size-1));
+
+  stats->min = -1, stats->max = 0;
+  for(int i=1;i<timestamps_size;i++) {
+    // Get min and max, does not take too many cycles
+    elapsed = timestamps[i] - timestamps[i-1];
+    stats->max = elapsed > stats->max ? elapsed : stats->max;
+    stats->min = elapsed < stats->min ? elapsed : stats->min;
+  }
+}
+
+/**
+  * @brief  This function delays accurately.
+  * @param  ticks : number of system ticks to wait
+  * @retval None
+  */
 static void HAL_Delay_us(uint32_t ticks)
 {
     SysTick->LOAD = ticks*10;
