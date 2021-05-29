@@ -43,6 +43,7 @@ add_definitions(-DUSE_STM32L4XX_NUCLEO)
 
 set(TARGET pulse_read_main)
 set(TARGET pulse_read_irq)
+set(TARGET pulse_read_irq_dma)
 
 MESSAGE(Target to build: ${TARGET})
 
