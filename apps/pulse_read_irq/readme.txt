@@ -145,3 +145,6 @@ In order to make the program work, you must do the following :
 
  * <h3><center>&copy; COPYRIGHT STMicroelectronics</center></h3>
  */
+
+Detect pulses via gpio irq, max measured is 40kHz
+Next step is using DMA transfer for serial instead of doing it in main thread

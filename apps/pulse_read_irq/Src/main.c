@@ -148,21 +148,6 @@ int main(void)
     Error_Handler();
   }
 
-  timestamps = (uint32_t*) malloc(timestamps_size*sizeof(uint32_t));
-
-  int pulses_to_detect = 1000000;
-  /* Wait all pulses have been detected */
-  while (detected_pulses < pulses_to_detect)
-  {
-  }
-
-  // Compute statistics
-  struct Statistics stats;
-  ComputeStats(timestamps, timestamps_size, &stats);
-
-  memset(aTxStartMessage, 0, ubSizeToSend);
-  sprintf(aTxStartMessage, "total: %0.2fs, mean: %0.2fus, std: %0.2fus, min: %luus, max: %luus, rate: %0.2fkHz\n\r", stats.total/1e6, stats.mean, stats.std_dev, stats.min, stats.max, 1/stats.mean*1e3);
-
   /*##-2- Configure UART peripheral for reception process (using LL) ##########*/  
   /* Any data received will be stored "aRxBuffer" buffer : the number max of 
      data received is RXBUFFERSIZE */
@@ -170,23 +155,66 @@ int main(void)
   LL_USART_EnableIT_RXNE(USARTx);
   LL_USART_EnableIT_ERROR(USARTx);
 
-  /*##-3- Start the transmission process (using LL) *##########################*/  
-  /* While the UART in reception process, user can transmit data from 
-     "aTxStartMessage" buffer */
-  /* Start USART transmission : Will initiate TXE interrupt after TDR register is empty */
-  LL_USART_TransmitData8(USARTx, aTxStartMessage[uwTxIndex++]); 
+  timestamps = (uint32_t*) malloc(timestamps_size*sizeof(uint32_t));
 
-  /* Enable TXE interrupt */
-  LL_USART_EnableIT_TXE(USARTx); 
+  uint32_t pulses_to_detect = 1e6;
+  pulses_to_detect = 1e5;
+  // pulses_to_detect = timestamps_size/2;
+  // pulses_to_detect = 5000;
+  // pulses_to_detect = 0;
+  int pulses_step_size = timestamps_size/2;
 
-  /*##-4- Wait for the end of the transfer ###################################*/
-  /* USART IRQ handler is not anymore routed to HAL_UART_IRQHandler() function 
-     and is now based on LL API functions use. 
-     Therefore, use of HAL IT based services is no more possible. */
-  /*  Once TX transfer is completed, LED2 will toggle.
-      Then, when RX transfer is completed, LED2 will turn On. */
-  while (ubTxComplete == 0)
-  {
+  struct Statistics stats;
+  int pulses_last_step = 0;
+  int pulses_next_step = pulses_step_size;
+  uint32_t* step_timestamps = timestamps;
+
+  int send_id = 0;
+
+  /* Wait all pulses have been detected */
+  while (detected_pulses < pulses_to_detect) {
+
+    // Wait for a part of pulse to be detected and compute stats
+    while (detected_pulses < pulses_next_step) {}
+
+    step_timestamps = timestamps;
+    step_timestamps += pulses_last_step % timestamps_size;
+
+    // Compute statistics
+    ComputeStats(step_timestamps, pulses_step_size, &stats);
+
+    pulses_last_step = pulses_next_step;
+    pulses_next_step += pulses_step_size;
+
+    // Initialize message to send
+    memset(aTxStartMessage, 0, ubSizeToSend);
+    
+    // Transmit results on serial link
+    sprintf(aTxStartMessage, "%d: total: %0.2fs, count: %lu mean: %0.2fus, std: %0.2fus, min: %luus, max: %luus, rate: %0.2fkHz\n\r", send_id, stats.total/1e6, stats.count, stats.mean, stats.std_dev, stats.min, stats.max, 1/stats.mean*1e3);
+
+    send_id++;
+
+    /*##-3- Start the transmission process (using LL) *##########################*/  
+    /* While the UART in reception process, user can transmit data from 
+      "aTxStartMessage" buffer */
+    /* Start USART transmission : Will initiate TXE interrupt after TDR register is empty */
+    LL_USART_TransmitData8(USARTx, aTxStartMessage[uwTxIndex++]); 
+
+    /* Enable TXE interrupt */
+    LL_USART_EnableIT_TXE(USARTx); 
+
+    /*##-4- Wait for the end of the transfer ###################################*/
+    /* USART IRQ handler is not anymore routed to HAL_UART_IRQHandler() function 
+      and is now based on LL API functions use. 
+      Therefore, use of HAL IT based services is no more possible. */
+    /*  Once TX transfer is completed, LED2 will toggle.
+        Then, when RX transfer is completed, LED2 will turn On. */
+    while (ubTxComplete == 0)
+    {
+    }
+
+    ubTxComplete = 0;
+
   }
 
   while (ubRxComplete == 0)
@@ -340,20 +368,20 @@ static void Error_Handler(void)
 static void ComputeStats(const uint32_t* timestamps, uint32_t size, struct Statistics* stats) {
   stats->count = size;
 
-  stats->total = timestamps[timestamps_size-1] - timestamps[0];
+  stats->total = timestamps[size-1] - timestamps[0];
   
-  stats->mean = stats->total/(timestamps_size-1);
+  stats->mean = stats->total/(size-1);
 
   stats->std_dev = 0;
   double elapsed;
-  for(int i=1;i<timestamps_size;i++) {
+  for(int i=1;i<size;i++) {
     elapsed = timestamps[i] - timestamps[i-1];
     stats->std_dev += (elapsed-stats->mean)*(elapsed-stats->mean);
   }
-  stats->std_dev = sqrt(stats->std_dev/(timestamps_size-1));
+  stats->std_dev = sqrt(stats->std_dev/(size-1));
 
   stats->min = -1, stats->max = 0;
-  for(int i=1;i<timestamps_size;i++) {
+  for(int i=1;i<size;i++) {
     // Get min and max, does not take too many cycles
     elapsed = timestamps[i] - timestamps[i-1];
     stats->max = elapsed > stats->max ? elapsed : stats->max;
@@ -500,13 +528,14 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
   if (GPIO_Pin == GPIO_PIN_8) {
 
-    // If first pulses detected, start timer else get timer counter
+    // If first pulses detected, start timer
     if(detected_pulses == 0) {
       HAL_TIM_Base_Start(&htim);
-    } else {
-      timestamps[detected_pulses%timestamps_size] =
-        __HAL_TIM_GET_COUNTER(&htim);
     }
+
+    // And store counter value
+    timestamps[detected_pulses%timestamps_size] =
+      __HAL_TIM_GET_COUNTER(&htim);
 
     /* Increment detected pulses */
     detected_pulses++;
