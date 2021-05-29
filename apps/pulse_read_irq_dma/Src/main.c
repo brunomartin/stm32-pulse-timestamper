@@ -47,7 +47,14 @@ __IO ITStatus UartReady = RESET;
 __IO uint32_t UserButtonStatus = 0;  /* set to 1 after User Button interrupt  */
 
 /* Buffer used for transmission */
-uint8_t aTxBuffer[] = " ****UART_TwoBoards communication based on DMA****  ****UART_TwoBoards communication based on DMA****  ****UART_TwoBoards communication based on DMA**** ";
+uint8_t aTxBuffer[] = "****READY TO RECEIVE PULSES****\n\r"
+"****READY TO RECEIVE PULSES****\n\r"
+"****READY TO RECEIVE PULSES****\n\r"
+"****READY TO RECEIVE PULSES****\n\r"
+"****READY TO RECEIVE PULSES****\n\r"
+"****READY TO RECEIVE PULSES****\n\r"
+"****READY TO RECEIVE PULSES****\n\r"
+;
 
 /* Buffer used for reception */
 uint8_t aRxBuffer[RXBUFFERSIZE];
@@ -126,12 +133,12 @@ int main(void)
     > stty 9600 -F /dev/ttyAMA0 parenb parodd cs7 -cstopb -crtscts
     > cat /dev/ttyAMA0
     > echo 1234567890 > /dev/ttyAMA0
-    > screen /dev/ttyAMA0 9600,cs7,parenb,parodd,-cstopb,-crtscts
+    > screen /dev/ttyAMA0 115200,cs7,parenb,parodd,-cstopb,-crtscts
       
   */
   UartHandle.Instance        = USARTx;
 
-  UartHandle.Init.BaudRate   = 9600;
+  UartHandle.Init.BaudRate   = 115200;
   UartHandle.Init.WordLength = UART_WORDLENGTH_8B;
   UartHandle.Init.StopBits   = UART_STOPBITS_1;
   UartHandle.Init.Parity     = UART_PARITY_ODD;
@@ -179,7 +186,8 @@ int main(void)
   timestamps = (uint32_t*) malloc(timestamps_size*sizeof(uint32_t));
 
   uint32_t pulses_to_detect = 1e6;
-  pulses_to_detect = 1e5;
+  // pulses_to_detect = 1e7;
+  // pulses_to_detect = 1e5;
   // pulses_to_detect = 0;
   int pulses_step_size = timestamps_size/2;
 
