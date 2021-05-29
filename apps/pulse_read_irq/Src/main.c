@@ -61,7 +61,12 @@ static void SystemClock_Config(void);
 static void Timer_Config(void);
 static void Error_Handler(void);
 
-static void EXTI15_10_IRQHandler_Config(void);
+static void EXTI9_5_IRQHandler_Config(void);
+
+__IO uint32_t  detected_pulses = 0;
+
+const uint32_t timestamps_size = 20000;
+uint32_t* timestamps;
 
 static void HAL_Delay_us(uint32_t ticks);
 
@@ -111,7 +116,7 @@ int main(void)
   Timer_Config();
 
   /* Configure External line 13 (connected to PC.13 pin) in interrupt mode */
-  EXTI15_10_IRQHandler_Config();
+  EXTI9_5_IRQHandler_Config();
   
   /* Configure leds */
   BSP_LED_Init(LED2);
@@ -148,6 +153,38 @@ int main(void)
     /* Initialization Error */
     Error_Handler();
   }
+
+  timestamps = (uint32_t*) malloc(timestamps_size*sizeof(uint32_t));
+
+  int pulses_to_detect = 1000000;
+  /* Wait all pulses have been detected */
+  while (detected_pulses < pulses_to_detect)
+  {
+  }
+
+  uint32_t min = -1, max = 0;
+  uint32_t elapsed;
+
+  for(int i=1;i<timestamps_size;i++) {
+
+    elapsed = timestamps[i] - timestamps[i-1];
+
+    // Get min and max, does not take too many cycles
+    max = elapsed > max ? elapsed : max;
+    min = elapsed < min ? elapsed : min;
+  }
+  
+  double mean = 0;
+  double total;
+
+  // Compute total and mean value is possible
+  total = timestamps[timestamps_size-1] - timestamps[0];
+  if(timestamps_size > 1) {
+    mean = total/(timestamps_size-1);
+  }
+
+  memset(aTxStartMessage, 0, ubSizeToSend);
+  sprintf(aTxStartMessage, "total: %0.2fs, mean: %0.2fus, min: %luus, max: %luus, rate: %0.2fkHz\n\r", total/1e6, mean, min, max, 1/mean*1e3);
 
   /*##-2- Configure UART peripheral for reception process (using LL) ##########*/  
   /* Any data received will be stored "aRxBuffer" buffer : the number max of 
@@ -416,28 +453,30 @@ void UART_Error_Callback(void)
   }
 }
 
+
 /**
   * @brief  Configures EXTI lines 10 to 15 (connected to PC.13 pin) in interrupt mode
   * @param  None
   * @retval None
   */
-static void EXTI15_10_IRQHandler_Config(void)
+static void EXTI9_5_IRQHandler_Config(void)
 {
   GPIO_InitTypeDef   GPIO_InitStructure;
 
   /* Enable GPIOC clock */
-  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /* Configure PC.13 pin as input floating */
   GPIO_InitStructure.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStructure.Pull = GPIO_NOPULL;
-  GPIO_InitStructure.Pin = GPIO_PIN_13;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStructure);
+  GPIO_InitStructure.Pull = GPIO_PULLDOWN;
+  GPIO_InitStructure.Pin = GPIO_PIN_8;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStructure);
 
   /* Enable and set EXTI lines 10 to 15 Interrupt to the lowest priority */
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 2, 0);
-  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 }
+
 
 /**
   * @brief EXTI line detection callbacks
@@ -446,10 +485,18 @@ static void EXTI15_10_IRQHandler_Config(void)
   */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-  if (GPIO_Pin == GPIO_PIN_13)
-  {
-    /* Toggle LED2 */
-    BSP_LED_Toggle(LED2);
+  if (GPIO_Pin == GPIO_PIN_8) {
+
+    // If first pulses detected, start timer else get timer counter
+    if(detected_pulses == 0) {
+      HAL_TIM_Base_Start(&htim);
+    } else {
+      timestamps[detected_pulses%timestamps_size] =
+        __HAL_TIM_GET_COUNTER(&htim);
+    }
+
+    /* Increment detected pulses */
+    detected_pulses++;
   }
 }
 
