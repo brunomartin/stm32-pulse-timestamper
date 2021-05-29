@@ -22,10 +22,16 @@ set(STM32L4_LD_SCRIPT "${CMAKE_SOURCE_DIR}/Drivers/BSP/STM32L476RGTx_FLASH.ld")
 set(CMAKE_EXE_LINKER_FLAGS "-Xlinker --gc-sections")
 
 # to define unless : undefined reference to `_sbrk'
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -specs=nano.specs -specs=nosys.specs")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -specs=nosys.specs")
+
+# to define unless : undefined reference to '__errno'
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -specs=rdimon.specs")
 
 # to enable printf for float format
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -u _printf_float")
+
+# add math libary in linker flags to avoir 
+# set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}  -mfloat-abi=hard")
 
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${CPU_FLAGS} -T\"${STM32L4_LD_SCRIPT}\"")
 

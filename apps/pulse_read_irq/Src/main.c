@@ -65,6 +65,7 @@ static void EXTI9_5_IRQHandler_Config(void);
 
 __IO uint32_t  detected_pulses = 0;
 
+// Set timestamps vector size, be aware of the total RAM size (96kB on this one)
 const uint32_t timestamps_size = 20000;
 uint32_t* timestamps;
 
@@ -162,29 +163,28 @@ int main(void)
   {
   }
 
-  uint32_t min = -1, max = 0;
-  uint32_t elapsed;
+  // Compute statistics
+  double total = timestamps[timestamps_size-1] - timestamps[0];
+  
+  double mean = total/(timestamps_size-1);
 
+  double std_dev = 0, elapsed;
   for(int i=1;i<timestamps_size;i++) {
-
     elapsed = timestamps[i] - timestamps[i-1];
+    std_dev += (elapsed-mean)*(elapsed-mean);
+  }
+  std_dev = sqrt(std_dev/(timestamps_size-1));
 
+  uint32_t min = -1, max = 0;
+  for(int i=1;i<timestamps_size;i++) {
     // Get min and max, does not take too many cycles
+    elapsed = timestamps[i] - timestamps[i-1];
     max = elapsed > max ? elapsed : max;
     min = elapsed < min ? elapsed : min;
   }
-  
-  double mean = 0;
-  double total;
-
-  // Compute total and mean value is possible
-  total = timestamps[timestamps_size-1] - timestamps[0];
-  if(timestamps_size > 1) {
-    mean = total/(timestamps_size-1);
-  }
 
   memset(aTxStartMessage, 0, ubSizeToSend);
-  sprintf(aTxStartMessage, "total: %0.2fs, mean: %0.2fus, min: %luus, max: %luus, rate: %0.2fkHz\n\r", total/1e6, mean, min, max, 1/mean*1e3);
+  sprintf(aTxStartMessage, "total: %0.2fs, mean: %0.2fus, std: %0.2fus, min: %luus, max: %luus, rate: %0.2fkHz\n\r", total/1e6, mean, std_dev, min, max, 1/mean*1e3);
 
   /*##-2- Configure UART peripheral for reception process (using LL) ##########*/  
   /* Any data received will be stored "aRxBuffer" buffer : the number max of 

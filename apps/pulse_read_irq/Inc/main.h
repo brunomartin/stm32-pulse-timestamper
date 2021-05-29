@@ -26,6 +26,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "stm32l4xx_hal.h"
 #include "stm32l4xx_nucleo.h"
