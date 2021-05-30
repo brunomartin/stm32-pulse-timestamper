@@ -27,11 +27,16 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <math.h>
+#include <stdarg.h>
 
 #include "stm32l4xx_hal.h"
 #include "stm32l4xx_nucleo.h"
 
 #include "stm32l4xx_hal_tim.h"
+
+#include "socket.h"
+#include "dhcp.h"
+#include "dns.h"
 
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
@@ -86,10 +91,17 @@
 /* Definition for TIMx clock resources */
 #define TIMx                           TIM2
 #define TIMx_CLK_ENABLE()              __HAL_RCC_TIM2_CLK_ENABLE()
+#define TIMx_CLK_DISABLE()              __HAL_RCC_TIM2_CLK_DISABLE()
 
 /* Definition for TIMx's NVIC */
 #define TIMx_IRQn                      TIM2_IRQn
 #define TIMx_IRQHandler                TIM2_IRQHandler
+
+/* w5500 stuff */
+
+#define DHCP_SOCKET     0
+#define DNS_SOCKET      1
+#define HTTP_SOCKET     2
 
 #endif /* __MAIN_H */
 

@@ -44,7 +44,6 @@ uint32_t uwPrescalerValue;
 /* UART handler declaration */
 UART_HandleTypeDef UartHandle;
 __IO ITStatus UartReady = RESET;
-__IO uint32_t UserButtonStatus = 0;  /* set to 1 after User Button interrupt  */
 
 /* Buffer used for transmission */
 uint8_t aTxBuffer[] = "****READY TO RECEIVE PULSES****\n\r"
@@ -58,6 +57,54 @@ uint8_t aTxBuffer[] = "****READY TO RECEIVE PULSES****\n\r"
 
 /* Buffer used for reception */
 uint8_t aRxBuffer[RXBUFFERSIZE];
+
+void UART_Printf(const char* fmt, ...);
+
+/* SPI stuff*/
+SPI_HandleTypeDef hspi1;
+
+/* w5500 stuff */
+void W5500_Select(void) {
+    // HAL_GPIO_WritePin(W5500_CS_GPIO_Port, W5500_CS_Pin, GPIO_PIN_RESET);
+}
+
+void W5500_Unselect(void) {
+    // HAL_GPIO_WritePin(W5500_CS_GPIO_Port, W5500_CS_Pin, GPIO_PIN_SET);
+}
+
+void W5500_ReadBuff(uint8_t* buff, uint16_t len) {
+    HAL_SPI_Receive(&hspi1, buff, len, HAL_MAX_DELAY);
+}
+
+void W5500_WriteBuff(uint8_t* buff, uint16_t len) {
+    HAL_SPI_Transmit(&hspi1, buff, len, HAL_MAX_DELAY);
+}
+
+uint8_t W5500_ReadByte(void) {
+    uint8_t byte;
+    W5500_ReadBuff(&byte, sizeof(byte));
+    return byte;
+}
+
+void W5500_WriteByte(uint8_t byte) {
+    W5500_WriteBuff(&byte, sizeof(byte));
+}
+
+volatile uint8_t ip_assigned = 0;
+
+void Callback_IPAssigned(void) {
+    UART_Printf("Callback: IP assigned! Leased time: %d sec\r\n", getDHCPLeasetime());
+    ip_assigned = 1;
+}
+ 
+void Callback_IPConflict(void) {
+    UART_Printf("Callback: IP conflict!\r\n");
+}
+
+// 1K should be enough, see https://forum.wiznet.io/t/topic/1612/2
+uint8_t dhcp_buffer[1024];
+// 1K seems to be enough for this buffer as well
+uint8_t dns_buffer[1024];
 
 // Detection variables
 __IO uint32_t  detected_pulses = 0;
@@ -81,6 +128,9 @@ static void Timer_Config(void);
 static void Error_Handler(void);
 
 static void EXTI4_IRQHandler_Config(void);
+
+static void SPI_Config(void);
+static void W5500_Config(void);
 
 static void ComputeStats(const uint32_t* timestamps,
   uint32_t size, struct Statistics* stats);
@@ -115,6 +165,9 @@ int main(void)
 
   /* Configure External line 13 (connected to PC.13 pin) in interrupt mode */
   EXTI4_IRQHandler_Config();
+
+  /* Configure SPI1 */
+  SPI_Config();
   
   /* Configure leds */
   BSP_LED_Init(LED2);
@@ -167,10 +220,10 @@ int main(void)
     Error_Handler();
   }
 
-  if(HAL_UART_Transmit_DMA(&UartHandle, (uint8_t*)aTxBuffer, TXBUFFERSIZE)!= HAL_OK)
-  {
-    Error_Handler();
-  }
+  UART_Printf(
+    "****READY TO RECEIVE PULSES****\n\r"
+    "****READY TO RECEIVE PULSES****\n\r"
+    "****READY TO RECEIVE PULSES****\n\r");
 
   /*##-4- Wait for the end of the transfer ###################################*/
   while (UartReady != SET) {
@@ -499,6 +552,20 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
 
 }
 
+void UART_Printf(const char* fmt, ...) {
+  char buff[256];
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(buff, sizeof(buff), fmt, args);
+
+  if(HAL_UART_Transmit_DMA(&UartHandle, (uint8_t*)buff, strlen(buff))!= HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  va_end(args);
+}
+
 /**
   * @brief  Configures EXTI lines 10 to 15 (connected to PC.13 pin) in interrupt mode
   * @param  None
@@ -543,6 +610,160 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     /* Increment detected pulses */
     detected_pulses++;
   }
+}
+
+/* SPI1 init function */
+static void SPI_Config(void)
+{
+
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+}
+
+void W5500_Config() {
+    UART_Printf("\r\ninit() called!\r\n");
+
+    UART_Printf("Registering W5500 callbacks...\r\n");
+    reg_wizchip_cs_cbfunc(W5500_Select, W5500_Unselect);
+    reg_wizchip_spi_cbfunc(W5500_ReadByte, W5500_WriteByte);
+    reg_wizchip_spiburst_cbfunc(W5500_ReadBuff, W5500_WriteBuff);
+
+    UART_Printf("Calling wizchip_init()...\r\n");
+    uint8_t rx_tx_buff_sizes[] = {2, 2, 2, 2, 2, 2, 2, 2};
+    wizchip_init(rx_tx_buff_sizes, rx_tx_buff_sizes);
+
+    UART_Printf("Calling DHCP_init()...\r\n");
+    wiz_NetInfo net_info = {
+        .mac  = { 0xEA, 0x11, 0x22, 0x33, 0x44, 0xEA },
+        .dhcp = NETINFO_DHCP
+    };
+    // set MAC address before using DHCP
+    setSHAR(net_info.mac);
+    DHCP_init(DHCP_SOCKET, dhcp_buffer);
+
+    UART_Printf("Registering DHCP callbacks...\r\n");
+    reg_dhcp_cbfunc(
+        Callback_IPAssigned,
+        Callback_IPAssigned,
+        Callback_IPConflict
+    );
+
+    UART_Printf("Calling DHCP_run()...\r\n");
+    // actually should be called in a loop, e.g. by timer
+    uint32_t ctr = 10000;
+    while((!ip_assigned) && (ctr > 0)) {
+        DHCP_run();
+        ctr--;
+    }
+    if(!ip_assigned) {
+        UART_Printf("\r\nIP was not assigned :(\r\n");
+        return;
+    }
+
+    getIPfromDHCP(net_info.ip);
+    getGWfromDHCP(net_info.gw);
+    getSNfromDHCP(net_info.sn);
+
+    uint8_t dns[4];
+    getDNSfromDHCP(dns);
+
+    UART_Printf("IP:  %d.%d.%d.%d\r\nGW:  %d.%d.%d.%d\r\nNet: %d.%d.%d.%d\r\nDNS: %d.%d.%d.%d\r\n",
+        net_info.ip[0], net_info.ip[1], net_info.ip[2], net_info.ip[3],
+        net_info.gw[0], net_info.gw[1], net_info.gw[2], net_info.gw[3],
+        net_info.sn[0], net_info.sn[1], net_info.sn[2], net_info.sn[3],
+        dns[0], dns[1], dns[2], dns[3]
+    );
+
+    UART_Printf("Calling wizchip_setnetinfo()...\r\n");
+    wizchip_setnetinfo(&net_info);
+
+    UART_Printf("Calling DNS_init()...\r\n");
+    DNS_init(DNS_SOCKET, dns_buffer);
+
+    uint8_t addr[4];
+    {
+        char domain_name[] = "eax.me";
+        UART_Printf("Resolving domain name \"%s\"...\r\n", domain_name);
+        int8_t res = DNS_run(dns, (uint8_t*)&domain_name, addr);
+        if(res != 1) {
+            UART_Printf("DNS_run() failed, res = %d", res);
+            return;
+        }
+        UART_Printf("Result: %d.%d.%d.%d\r\n", addr[0], addr[1], addr[2], addr[3]);
+    }
+
+    UART_Printf("Creating socket...\r\n");
+    uint8_t http_socket = HTTP_SOCKET;
+    uint8_t code = socket(http_socket, Sn_MR_TCP, 10888, 0);
+    if(code != http_socket) {
+        UART_Printf("socket() failed, code = %d\r\n", code);
+        return;
+    }
+
+    UART_Printf("Socket created, connecting...\r\n");
+    code = connect(http_socket, addr, 80);
+    if(code != SOCK_OK) {
+        UART_Printf("connect() failed, code = %d\r\n", code);
+        close(http_socket);
+        return;
+    }
+
+    UART_Printf("Connected, sending HTTP request...\r\n");
+    {
+        char req[] = "GET / HTTP/1.0\r\nHost: eax.me\r\n\r\n";
+        uint16_t len = sizeof(req) - 1;
+        uint8_t* buff = (uint8_t*)&req;
+        while(len > 0) {
+            UART_Printf("Sending %d bytes...\r\n", len);
+            int32_t nbytes = send(http_socket, buff, len);
+            if(nbytes <= 0) {
+                UART_Printf("send() failed, %d returned\r\n", nbytes);
+                close(http_socket);
+                return;
+            }
+            UART_Printf("%d bytes sent!\r\n", nbytes);
+            len -= nbytes;
+        }
+    }
+
+    UART_Printf("Request sent. Reading response...\r\n");
+    {
+        char buff[32];
+        for(;;) {
+            int32_t nbytes = recv(http_socket, (uint8_t*)&buff, sizeof(buff)-1);
+            if(nbytes == SOCKERR_SOCKSTATUS) {
+                UART_Printf("\r\nConnection closed.\r\n");
+                break;
+            }
+
+            if(nbytes <= 0) {
+                UART_Printf("\r\nrecv() failed, %d returned\r\n", nbytes);
+                break;
+            }
+
+            buff[nbytes] = '\0';
+            UART_Printf("%s", buff);
+        }
+    }
+
+    UART_Printf("Closing socket.\r\n");
+    close(http_socket);
 }
 
 

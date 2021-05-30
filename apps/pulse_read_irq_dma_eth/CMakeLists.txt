@@ -6,9 +6,15 @@ set(iolib_src
   ioLibrary_Driver/Ethernet/socket.c
   ioLibrary_Driver/Ethernet/wizchip_conf.c
   ioLibrary_Driver/Ethernet/W5500/w5500.c
+  ioLibrary_Driver/Internet/DHCP/dhcp.c
+  ioLibrary_Driver/Internet/DNS/dns.c
 )
 
-include_directories(ioLibrary_Driver/Ethernet)
+include_directories(
+  ioLibrary_Driver/Ethernet
+  ioLibrary_Driver/Internet/DHCP
+  ioLibrary_Driver/Internet/DNS
+)
 
 set(STM32_OBJECTS $<TARGET_OBJECTS:startup> $<TARGET_OBJECTS:system> $<TARGET_OBJECTS:stm32l4xx_hal>)
 
