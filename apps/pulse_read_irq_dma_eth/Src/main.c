@@ -59,17 +59,18 @@ uint8_t aTxBuffer[] = "****READY TO RECEIVE PULSES****\n\r"
 uint8_t aRxBuffer[RXBUFFERSIZE];
 
 void UART_Printf(const char* fmt, ...);
+void UART_Printf_No_Block(const char* fmt, ...);
 
 /* SPI stuff*/
 SPI_HandleTypeDef hspi1;
 
 /* w5500 stuff */
 void W5500_Select(void) {
-    // HAL_GPIO_WritePin(W5500_CS_GPIO_Port, W5500_CS_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(W5500_CS_GPIO_Port, W5500_CS_Pin, GPIO_PIN_RESET);
 }
 
 void W5500_Unselect(void) {
-    // HAL_GPIO_WritePin(W5500_CS_GPIO_Port, W5500_CS_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(W5500_CS_GPIO_Port, W5500_CS_Pin, GPIO_PIN_SET);
 }
 
 void W5500_ReadBuff(uint8_t* buff, uint16_t len) {
@@ -129,6 +130,8 @@ static void Error_Handler(void);
 
 static void EXTI4_IRQHandler_Config(void);
 
+static void UART_Config(void);
+
 static void SPI_Config(void);
 static void W5500_Config(void);
 
@@ -166,75 +169,21 @@ int main(void)
   /* Configure External line 13 (connected to PC.13 pin) in interrupt mode */
   EXTI4_IRQHandler_Config();
 
+  /* Configure UART */
+  UART_Config();
+
+  UART_Printf("UART configured\n\r");
+
   /* Configure SPI1 */
   SPI_Config();
+  
+  /* Configure w5500 */
+  W5500_Config();
   
   /* Configure leds */
   BSP_LED_Init(LED2);
 
-  /*##-1- Configure the UART peripheral using HAL services ###################*/
-  /* Put the USART peripheral in the Asynchronous mode (UART Mode) */
-  /* UART configured as follows:
-      - Word Length = 8 Bits (7 data bit + 1 parity bit) : 
-	                  BE CAREFUL : Program 7 data bits + 1 parity bit in PC HyperTerminal
-      - Stop Bit    = One Stop bit
-      - Parity      = ODD parity
-      - BaudRate    = 9600 baud
-      - Hardware flow control disabled (RTS and CTS signals)
-
-    To test it on a rpi4:
-    > stty 9600 -F /dev/ttyAMA0 parenb parodd cs7 -cstopb -crtscts
-    > cat /dev/ttyAMA0
-    > echo 1234567890 > /dev/ttyAMA0
-    > screen /dev/ttyAMA0 115200,cs7,parenb,parodd,-cstopb,-crtscts
-      
-  */
-  UartHandle.Instance        = USARTx;
-
-  UartHandle.Init.BaudRate   = 115200;
-  UartHandle.Init.WordLength = UART_WORDLENGTH_8B;
-  UartHandle.Init.StopBits   = UART_STOPBITS_1;
-  UartHandle.Init.Parity     = UART_PARITY_ODD;
-  UartHandle.Init.HwFlowCtl  = UART_HWCONTROL_NONE;
-  UartHandle.Init.Mode       = UART_MODE_TX_RX;
-  UartHandle.Init.OverSampling = UART_OVERSAMPLING_16;
-  UartHandle.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-
-  if(HAL_UART_DeInit(&UartHandle) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  if(HAL_UART_Init(&UartHandle) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /* The board sends the message and expects to receive it back */
-  /* DMA is programmed for reception before starting the transmission, in order to
-     be sure DMA Rx is ready when board 2 will start transmitting */
-
-  /*##-2- Program the Reception process #####################################*/  
-  if(HAL_UART_Receive_DMA(&UartHandle, (uint8_t *)aRxBuffer, RXBUFFERSIZE) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  UART_Printf(
-    "****READY TO RECEIVE PULSES****\n\r"
-    "****READY TO RECEIVE PULSES****\n\r"
-    "****READY TO RECEIVE PULSES****\n\r");
-
-  /*##-4- Wait for the end of the transfer ###################################*/
-  while (UartReady != SET) {
-    BSP_LED_Off(LED2); 
-    HAL_Delay(900); 
-    BSP_LED_On(LED2); 
-    HAL_Delay(100); 
-  }
-
-  /* Reset transmission flag */
-  UartReady = RESET;
+  UART_Printf("****READY TO RECEIVE PULSES****\n\r");
 
   timestamps = (uint32_t*) malloc(timestamps_size*sizeof(uint32_t));
 
@@ -525,6 +474,61 @@ static void HAL_Delay_us(uint32_t ticks)
 }
 
 /**
+  * @brief  This function configure UART.
+  * @retval None
+  */
+static void UART_Config(void) {
+
+  /*##-1- Configure the UART peripheral using HAL services ###################*/
+  /* Put the USART peripheral in the Asynchronous mode (UART Mode) */
+  /* UART configured as follows:
+      - Word Length = 8 Bits (7 data bit + 1 parity bit) : 
+	                  BE CAREFUL : Program 7 data bits + 1 parity bit in PC HyperTerminal
+      - Stop Bit    = One Stop bit
+      - Parity      = ODD parity
+      - BaudRate    = 9600 baud
+      - Hardware flow control disabled (RTS and CTS signals)
+
+    To test it on a rpi4:
+    > stty 9600 -F /dev/ttyAMA0 parenb parodd cs7 -cstopb -crtscts
+    > cat /dev/ttyAMA0
+    > echo 1234567890 > /dev/ttyAMA0
+    > screen /dev/ttyAMA0 115200,cs7,parenb,parodd,-cstopb,-crtscts
+      
+  */
+  UartHandle.Instance        = USARTx;
+
+  UartHandle.Init.BaudRate   = 115200;
+  UartHandle.Init.WordLength = UART_WORDLENGTH_8B;
+  UartHandle.Init.StopBits   = UART_STOPBITS_1;
+  UartHandle.Init.Parity     = UART_PARITY_ODD;
+  UartHandle.Init.HwFlowCtl  = UART_HWCONTROL_NONE;
+  UartHandle.Init.Mode       = UART_MODE_TX_RX;
+  UartHandle.Init.OverSampling = UART_OVERSAMPLING_16;
+  UartHandle.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+
+  if(HAL_UART_DeInit(&UartHandle) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if(HAL_UART_Init(&UartHandle) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /* The board sends the message and expects to receive it back */
+  /* DMA is programmed for reception before starting the transmission, in order to
+     be sure DMA Rx is ready when board 2 will start transmitting */
+
+  /*##-2- Program the Reception process #####################################*/  
+  if(HAL_UART_Receive_DMA(&UartHandle, (uint8_t *)aRxBuffer, RXBUFFERSIZE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
   * @brief  Tx Transfer completed callback
   * @param  UartHandle: UART handle. 
   * @note   This example shows a simple way to report end of DMA Tx transfer, and 
@@ -563,6 +567,17 @@ void UART_Printf(const char* fmt, ...) {
     Error_Handler();
   }
 
+  va_end(args);
+
+  while (UartReady != SET) {}
+  UartReady = RESET;
+}
+
+void UART_Printf_No_Block(const char* fmt, ...) {
+
+  va_list args;
+  va_start(args, fmt);
+  UART_Printf(fmt, args);
   va_end(args);
 }
 
@@ -637,7 +652,7 @@ static void SPI_Config(void)
 }
 
 void W5500_Config() {
-    UART_Printf("\r\ninit() called!\r\n");
+    UART_Printf("init() called!\r\n");
 
     UART_Printf("Registering W5500 callbacks...\r\n");
     reg_wizchip_cs_cbfunc(W5500_Select, W5500_Unselect);
@@ -671,6 +686,7 @@ void W5500_Config() {
         DHCP_run();
         ctr--;
     }
+
     if(!ip_assigned) {
         UART_Printf("\r\nIP was not assigned :(\r\n");
         return;
@@ -698,7 +714,7 @@ void W5500_Config() {
 
     uint8_t addr[4];
     {
-        char domain_name[] = "eax.me";
+        char domain_name[] = "google.com";
         UART_Printf("Resolving domain name \"%s\"...\r\n", domain_name);
         int8_t res = DNS_run(dns, (uint8_t*)&domain_name, addr);
         if(res != 1) {
@@ -710,7 +726,12 @@ void W5500_Config() {
 
     UART_Printf("Creating socket...\r\n");
     uint8_t http_socket = HTTP_SOCKET;
-    uint8_t code = socket(http_socket, Sn_MR_TCP, 10888, 0);
+
+// #define NON_BLOCKING_MODE
+
+#ifdef NON_BLOCKING_MODE
+
+    uint8_t code = socket(http_socket, Sn_MR_TCP, 10888, SF_IO_NONBLOCK);
     if(code != http_socket) {
         UART_Printf("socket() failed, code = %d\r\n", code);
         return;
@@ -718,7 +739,7 @@ void W5500_Config() {
 
     UART_Printf("Socket created, connecting...\r\n");
     code = connect(http_socket, addr, 80);
-    if(code != SOCK_OK) {
+    if(code != SOCK_BUSY) {
         UART_Printf("connect() failed, code = %d\r\n", code);
         close(http_socket);
         return;
@@ -726,7 +747,7 @@ void W5500_Config() {
 
     UART_Printf("Connected, sending HTTP request...\r\n");
     {
-        char req[] = "GET / HTTP/1.0\r\nHost: eax.me\r\n\r\n";
+        char req[] = "GET / HTTP/1.0\r\nHost: google.com\r\n\r\n";
         uint16_t len = sizeof(req) - 1;
         uint8_t* buff = (uint8_t*)&req;
         while(len > 0) {
@@ -761,6 +782,62 @@ void W5500_Config() {
             UART_Printf("%s", buff);
         }
     }
+
+#else
+
+    uint8_t code = socket(http_socket, Sn_MR_TCP, 10888, 0);
+    if(code != http_socket) {
+        UART_Printf("socket() failed, code = %d\r\n", code);
+        return;
+    }
+
+    UART_Printf("Socket created, connecting...\r\n");
+    code = connect(http_socket, addr, 80);
+    if(code != SOCK_OK) {
+        UART_Printf("connect() failed, code = %d\r\n", code);
+        close(http_socket);
+        return;
+    }
+
+    UART_Printf("Connected, sending HTTP request...\r\n");
+    {
+        char req[] = "GET / HTTP/1.0\r\nHost: google.com\r\n\r\n";
+        uint16_t len = sizeof(req) - 1;
+        uint8_t* buff = (uint8_t*)&req;
+        while(len > 0) {
+            UART_Printf("Sending %d bytes...\r\n", len);
+            int32_t nbytes = send(http_socket, buff, len);
+            if(nbytes <= 0) {
+                UART_Printf("send() failed, %d returned\r\n", nbytes);
+                close(http_socket);
+                return;
+            }
+            UART_Printf("%d bytes sent!\r\n", nbytes);
+            len -= nbytes;
+        }
+    }
+
+    UART_Printf("Request sent. Reading response...\r\n");
+    {
+        char buff[32];
+        for(;;) {
+            int32_t nbytes = recv(http_socket, (uint8_t*)&buff, sizeof(buff)-1);
+            if(nbytes == SOCKERR_SOCKSTATUS) {
+                UART_Printf("\r\nConnection closed.\r\n");
+                break;
+            }
+
+            if(nbytes <= 0) {
+                UART_Printf("\r\nrecv() failed, %d returned\r\n", nbytes);
+                break;
+            }
+
+            buff[nbytes] = '\0';
+            UART_Printf("%s", buff);
+        }
+    }
+
+#endif
 
     UART_Printf("Closing socket.\r\n");
     close(http_socket);

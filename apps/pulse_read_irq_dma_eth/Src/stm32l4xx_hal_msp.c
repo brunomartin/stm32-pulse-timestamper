@@ -213,14 +213,16 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
 {
 
   GPIO_InitTypeDef GPIO_InitStruct;
-  if(hspi->Instance==SPI1)
-  {
-  /* USER CODE BEGIN SPI1_MspInit 0 */
+  if(hspi->Instance==SPI1) {
 
-  /* USER CODE END SPI1_MspInit 0 */
+    // Enable clock for GPIOC port for W5500_CS_Pin
+
+    /* USER CODE BEGIN SPI1_MspInit 0 */
+
+    /* USER CODE END SPI1_MspInit 0 */
     /* Peripheral clock enable */
     __HAL_RCC_SPI1_CLK_ENABLE();
-  
+
     /**SPI1 GPIO Configuration    
     PA5     ------> SPI1_SCK
     PA6     ------> SPI1_MISO
@@ -233,9 +235,19 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     GPIO_InitStruct.Alternate = GPIO_AF5_SPI1;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /* USER CODE BEGIN SPI1_MspInit 1 */
+    __HAL_RCC_GPIOB_CLK_ENABLE();
 
-  /* USER CODE END SPI1_MspInit 1 */
+    /*Configure GPIO pin : W5500_CS_Pin */
+    GPIO_InitStruct.Pin = W5500_CS_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(W5500_CS_GPIO_Port, &GPIO_InitStruct);
+
+
+    /* USER CODE BEGIN SPI1_MspInit 1 */
+
+    /* USER CODE END SPI1_MspInit 1 */
   }
 
 }
