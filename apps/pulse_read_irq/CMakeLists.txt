@@ -1,12 +1,12 @@
-file(GLOB_RECURSE app_src ${TARGET}/*.c)
+file(GLOB app_src Src/*.c)
 
-include_directories(${TARGET}/Inc)
+include_directories(Inc)
 
 set(STM32_OBJECTS $<TARGET_OBJECTS:startup> $<TARGET_OBJECTS:system> $<TARGET_OBJECTS:stm32l4xx_hal>)
 
 add_executable(${TARGET} ${app_src} ${STM32_OBJECTS})
 
-string(APPEND CMAKE_EXE_LINKER_FLAGS " -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/app.map")
+# string(APPEND CMAKE_EXE_LINKER_FLAGS " -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/app.map")
 
 _generate_object(${TARGET} .bin binary)
 _generate_object(${TARGET} .hex ihex)

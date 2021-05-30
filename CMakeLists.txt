@@ -44,6 +44,7 @@ add_definitions(-DUSE_STM32L4XX_NUCLEO)
 set(TARGET pulse_read_main)
 set(TARGET pulse_read_irq)
 set(TARGET pulse_read_irq_dma)
+# set(TARGET pulse_read_irq_dma_eth)
 
 MESSAGE(Target to build: ${TARGET})
 
@@ -60,9 +61,9 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/apps/${TARGET}/Inc
 )
 
-set(TARGET_BIN apps/${TARGET}.bin)
+set(TARGET_BIN apps/${TARGET}/${TARGET}.bin)
 
-add_subdirectory(apps)
+add_subdirectory(apps/${TARGET})
 add_subdirectory(Drivers)
 
 add_custom_command(OUTPUT arm_${TARGET}.flash
