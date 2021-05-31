@@ -670,10 +670,10 @@ void W5500_Config() {
     // Sum for each must not exceed 16
     // Vector size must be 8 for w5500 (_WIZCHIP_SOCK_NUM_)
 
-    // uint8_t tx_buff_sizes[] = {2, 2, 2, 2, 2, 2, 2, 2};
-    // uint8_t rx_buff_sizes[] = {2, 2, 2, 2, 2, 2, 2, 2};
-    uint8_t tx_buff_sizes[] = {2, 2, 2, 8, 0, 0, 0, 0};
-    uint8_t rx_buff_sizes[] = {2, 2, 2, 8, 0, 0, 0, 0};
+    uint8_t tx_buff_sizes[] = {2, 2, 2, 2, 2, 2, 2, 2};
+    uint8_t rx_buff_sizes[] = {2, 2, 2, 2, 2, 2, 2, 2};
+    // uint8_t tx_buff_sizes[] = {2, 2, 2, 8, 0, 0, 0, 0};
+    // uint8_t rx_buff_sizes[] = {2, 2, 2, 8, 0, 0, 0, 0};
     if(wizchip_init(tx_buff_sizes, rx_buff_sizes) != 0) {
       UART_Printf("wizchip_init() ERROR !\r\n");
     }
@@ -740,6 +740,11 @@ void W5500_Config() {
         }
         UART_Printf("Result: %d.%d.%d.%d\r\n", addr[0], addr[1], addr[2], addr[3]);
     }
+
+    wiz_PhyConf phy_conf;
+    wizphy_getphyconf(&phy_conf);
+    phy_conf.speed = PHY_SPEED_100;
+    wizphy_setphyconf(&phy_conf);
 
     // http_request_example(addr);
     udp_server_example(addr);
@@ -861,7 +866,7 @@ void udp_server_example(uint8_t* addr) {
     uint8_t* buff = (uint8_t*)timestamps;
 
     int32_t nbytes = sendto(udp_socket, buff, len, address, 8042);
-    UART_Printf("%d: sendto Result: %d\r\n", i+1, nbytes);
+    // UART_Printf("%d: sendto Result: %d\r\n", i+1, nbytes);
 
     // while(len > 0) {
     //     UART_Printf("Sending %d bytes...\r\n", len);
