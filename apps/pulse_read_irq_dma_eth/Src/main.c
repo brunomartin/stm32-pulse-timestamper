@@ -651,6 +651,9 @@ static void SPI_Config(void)
 
 }
 
+void http_request_example(uint8_t* addr);
+void udp_server_example(uint8_t* addr);
+
 void W5500_Config() {
     UART_Printf("init() called!\r\n");
 
@@ -724,66 +727,14 @@ void W5500_Config() {
         UART_Printf("Result: %d.%d.%d.%d\r\n", addr[0], addr[1], addr[2], addr[3]);
     }
 
+    // http_request_example(addr);
+    udp_server_example(addr);
+}
+
+void http_request_example(uint8_t* addr) {
+
     UART_Printf("Creating socket...\r\n");
     uint8_t http_socket = HTTP_SOCKET;
-
-// #define NON_BLOCKING_MODE
-
-#ifdef NON_BLOCKING_MODE
-
-    uint8_t code = socket(http_socket, Sn_MR_TCP, 10888, SF_IO_NONBLOCK);
-    if(code != http_socket) {
-        UART_Printf("socket() failed, code = %d\r\n", code);
-        return;
-    }
-
-    UART_Printf("Socket created, connecting...\r\n");
-    code = connect(http_socket, addr, 80);
-    if(code != SOCK_BUSY) {
-        UART_Printf("connect() failed, code = %d\r\n", code);
-        close(http_socket);
-        return;
-    }
-
-    UART_Printf("Connected, sending HTTP request...\r\n");
-    {
-        char req[] = "GET / HTTP/1.0\r\nHost: google.com\r\n\r\n";
-        uint16_t len = sizeof(req) - 1;
-        uint8_t* buff = (uint8_t*)&req;
-        while(len > 0) {
-            UART_Printf("Sending %d bytes...\r\n", len);
-            int32_t nbytes = send(http_socket, buff, len);
-            if(nbytes <= 0) {
-                UART_Printf("send() failed, %d returned\r\n", nbytes);
-                close(http_socket);
-                return;
-            }
-            UART_Printf("%d bytes sent!\r\n", nbytes);
-            len -= nbytes;
-        }
-    }
-
-    UART_Printf("Request sent. Reading response...\r\n");
-    {
-        char buff[32];
-        for(;;) {
-            int32_t nbytes = recv(http_socket, (uint8_t*)&buff, sizeof(buff)-1);
-            if(nbytes == SOCKERR_SOCKSTATUS) {
-                UART_Printf("\r\nConnection closed.\r\n");
-                break;
-            }
-
-            if(nbytes <= 0) {
-                UART_Printf("\r\nrecv() failed, %d returned\r\n", nbytes);
-                break;
-            }
-
-            buff[nbytes] = '\0';
-            UART_Printf("%s", buff);
-        }
-    }
-
-#else
 
     uint8_t code = socket(http_socket, Sn_MR_TCP, 10888, 0);
     if(code != http_socket) {
@@ -837,12 +788,87 @@ void W5500_Config() {
         }
     }
 
-#endif
-
     UART_Printf("Closing socket.\r\n");
     close(http_socket);
 }
 
+void udp_server_example(uint8_t* addr) {
+
+  UART_Printf("Creating UDP socket...\r\n");
+  uint8_t udp_socket = UDP_SOCKET;
+
+  int8_t result;
+	uint8_t testBuffer[] 	= "Wiznet Says Hi!\r\n";
+	// uint8_t address[4]		= { 192, 168, 1, 40 };
+	uint8_t address[4]		= { 255, 255, 255, 255 };
+
+  size_t buffer_size = strlen(testBuffer);
+
+  // result = socket(udp_socket, Sn_MR_UDP, 3000, SF_IO_NONBLOCK);
+  result = socket(udp_socket, Sn_MR_UDP, 8042, 0);
+  UART_Printf("socket Result: %d\r\n", result);
+
+  memset(testBuffer, 0, strlen(testBuffer));
+
+  UART_Printf("Waiting for client...\r\n");
+
+  uint16_t port;
+  result = recvfrom(udp_socket, testBuffer, buffer_size, address, &port);
+  UART_Printf("recvFrom Result: %d\r\n", result);
+  UART_Printf("recvFrom port: %u\r\n", port);
+
+  UART_Printf("Received testBuffer: %s\r\n", testBuffer);
+
+	//
+  for(int i=0;i<10;i++)
+  {
+    result = sendto(udp_socket, testBuffer, strlen(testBuffer), address, 8042);
+    // result = send(udp_socket, testBuffer, strlen(testBuffer));
+    UART_Printf("sendto Result: %d\r\n", result);
+
+    HAL_Delay(1000);
+  }
+
+  UART_Printf("Closing socket.\r\n");
+  close(udp_socket);
+
+  return;
+
+  uint8_t code = socket(udp_socket, Sn_MR_UDP, 8042, 0);
+  if(code != udp_socket) {
+      UART_Printf("socket() failed, code = %d\r\n", code);
+      return;
+  }
+
+  UART_Printf("Socket created, listening...\r\n");
+  code = listen(udp_socket);
+  if(code != SOCK_OK) {
+      UART_Printf("listen() failed, code = %d\r\n", code);
+      close(udp_socket);
+      return;
+  }
+
+  UART_Printf("Client connected, sending UDP packet...\r\n");
+  {
+      char message[] = "BONJOUR !!!\r\n\r\n";
+      uint16_t len = sizeof(message) - 1;
+      uint8_t* buff = (uint8_t*)&message;
+      while(len > 0) {
+          UART_Printf("Sending %d bytes...\r\n", len);
+          int32_t nbytes = send(udp_socket, buff, len);
+          if(nbytes <= 0) {
+              UART_Printf("send() failed, %d returned\r\n", nbytes);
+              close(udp_socket);
+              return;
+          }
+          UART_Printf("%d bytes sent!\r\n", nbytes);
+          len -= nbytes;
+      }
+  }
+
+  UART_Printf("Closing socket.\r\n");
+  close(udp_socket);
+}
 
 #ifdef  USE_FULL_ASSERT
 /**

@@ -105,6 +105,7 @@
 #define DHCP_SOCKET     0
 #define DNS_SOCKET      1
 #define HTTP_SOCKET     2
+#define UDP_SOCKET      3
 
 #endif /* __MAIN_H */
 
