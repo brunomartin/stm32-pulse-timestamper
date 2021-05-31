@@ -176,6 +176,12 @@ int main(void)
 
   /* Configure SPI1 */
   SPI_Config();
+
+  timestamps = (uint32_t*) malloc(timestamps_size*sizeof(uint32_t));
+
+  for(size_t i=0;i<timestamps_size;i++) {
+    timestamps[i] = (uint32_t) i;
+  }
   
   /* Configure w5500 */
   W5500_Config();
@@ -184,8 +190,6 @@ int main(void)
   BSP_LED_Init(LED2);
 
   UART_Printf("****READY TO RECEIVE PULSES****\n\r");
-
-  timestamps = (uint32_t*) malloc(timestamps_size*sizeof(uint32_t));
 
   uint32_t pulses_to_detect = 1e6;
   // pulses_to_detect = 1e7;
@@ -663,8 +667,18 @@ void W5500_Config() {
     reg_wizchip_spiburst_cbfunc(W5500_ReadBuff, W5500_WriteBuff);
 
     UART_Printf("Calling wizchip_init()...\r\n");
-    uint8_t rx_tx_buff_sizes[] = {2, 2, 2, 2, 2, 2, 2, 2};
-    wizchip_init(rx_tx_buff_sizes, rx_tx_buff_sizes);
+    // Sum for each must not exceed 16
+    // Vector size must be 8 for w5500 (_WIZCHIP_SOCK_NUM_)
+
+    // uint8_t tx_buff_sizes[] = {2, 2, 2, 2, 2, 2, 2, 2};
+    // uint8_t rx_buff_sizes[] = {2, 2, 2, 2, 2, 2, 2, 2};
+    uint8_t tx_buff_sizes[] = {2, 2, 2, 8, 0, 0, 0, 0};
+    uint8_t rx_buff_sizes[] = {2, 2, 2, 8, 0, 0, 0, 0};
+    if(wizchip_init(tx_buff_sizes, rx_buff_sizes) != 0) {
+      UART_Printf("wizchip_init() ERROR !\r\n");
+    }
+
+    setSn_TXBUF_SIZE(UDP_SOCKET, 16);
 
     UART_Printf("Calling DHCP_init()...\r\n");
     wiz_NetInfo net_info = {
@@ -804,9 +818,19 @@ void udp_server_example(uint8_t* addr) {
 
   size_t buffer_size = strlen(testBuffer);
 
+  // Set sock options before instanciation
+  // SO_MSS max seems to be 1472
+  uint16_t value = 1 << 12;
+  setsockopt(udp_socket, SO_MSS, &value);
+
   // result = socket(udp_socket, Sn_MR_UDP, 8042, 0);
   result = socket(udp_socket, Sn_MR_UDP, 8042, SF_IO_NONBLOCK);
   UART_Printf("socket Result: %d\r\n", result);
+
+  getsockopt(udp_socket, SO_MSS, &value);
+  UART_Printf("SO_MSS: %d\r\n", value);
+
+  // setsockopt(udp_socket, SO_KEEPALIVESEND, NULL);
 
   // memset(testBuffer, 0, strlen(testBuffer));
 
@@ -827,14 +851,31 @@ void udp_server_example(uint8_t* addr) {
 
   UART_Printf("Received testBuffer: %s\r\n", testBuffer);
 
-	//
-  for(int i=0;i<100;i++)
-  {
-    result = sendto(udp_socket, testBuffer, strlen(testBuffer), address, 8042);
-    // result = send(udp_socket, testBuffer, strlen(testBuffer));
-    UART_Printf("sendto Result: %d\r\n", result);
+  int32_t bytes_to_send = 16*(1<<10);
+  // bytes_to_send = 1*(1<<10);
+  // bytes_to_send = timestamps_size*2;
 
-    HAL_Delay(1000);
+  for(int i=0;i<1000;i++) {
+
+    uint16_t len = bytes_to_send;
+    uint8_t* buff = (uint8_t*)timestamps;
+
+    int32_t nbytes = sendto(udp_socket, buff, len, address, 8042);
+    UART_Printf("%d: sendto Result: %d\r\n", i+1, nbytes);
+
+    // while(len > 0) {
+    //     UART_Printf("Sending %d bytes...\r\n", len);
+    //     int32_t nbytes = sendto(udp_socket, buff, len, address, 8042);
+    //     if(nbytes <= 0) {
+    //         UART_Printf("send() failed, %d returned\r\n", nbytes);
+    //         close(udp_socket);
+    //         return;
+    //     }
+    //     UART_Printf("%d bytes sent!\r\n", nbytes);
+    //     len -= nbytes;
+    // }
+
+    // HAL_Delay(10);
   }
 
   UART_Printf("Closing socket.\r\n");
