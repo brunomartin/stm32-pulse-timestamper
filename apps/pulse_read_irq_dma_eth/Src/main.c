@@ -799,28 +799,36 @@ void udp_server_example(uint8_t* addr) {
 
   int8_t result;
 	uint8_t testBuffer[] 	= "Wiznet Says Hi!\r\n";
-	// uint8_t address[4]		= { 192, 168, 1, 40 };
-	uint8_t address[4]		= { 255, 255, 255, 255 };
+	uint8_t address[4]		= { 192, 168, 1, 40 };
+	// uint8_t address[4]		= { 255, 255, 255, 255 };
 
   size_t buffer_size = strlen(testBuffer);
 
-  // result = socket(udp_socket, Sn_MR_UDP, 3000, SF_IO_NONBLOCK);
-  result = socket(udp_socket, Sn_MR_UDP, 8042, 0);
+  // result = socket(udp_socket, Sn_MR_UDP, 8042, 0);
+  result = socket(udp_socket, Sn_MR_UDP, 8042, SF_IO_NONBLOCK);
   UART_Printf("socket Result: %d\r\n", result);
 
-  memset(testBuffer, 0, strlen(testBuffer));
+  // memset(testBuffer, 0, strlen(testBuffer));
 
   UART_Printf("Waiting for client...\r\n");
 
   uint16_t port;
   result = recvfrom(udp_socket, testBuffer, buffer_size, address, &port);
+  while(result == 0) {
+    result = recvfrom(udp_socket, testBuffer, buffer_size, address, &port);
+  }
+  // result = recv(udp_socket, testBuffer, buffer_size);
   UART_Printf("recvFrom Result: %d\r\n", result);
+
+  UART_Printf("recvFrom address:  %d.%d.%d.%d\r\n",
+      address[0], address[1], address[2], address[3]
+  );
   UART_Printf("recvFrom port: %u\r\n", port);
 
   UART_Printf("Received testBuffer: %s\r\n", testBuffer);
 
 	//
-  for(int i=0;i<10;i++)
+  for(int i=0;i<100;i++)
   {
     result = sendto(udp_socket, testBuffer, strlen(testBuffer), address, 8042);
     // result = send(udp_socket, testBuffer, strlen(testBuffer));
