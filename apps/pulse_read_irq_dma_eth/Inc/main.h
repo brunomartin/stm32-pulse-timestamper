@@ -138,11 +138,11 @@
 
 /* Definition for exterior interrupts */
 
-#define EXTIx_IRQHandler               EXTI4_IRQHandler
-#define EXTIx_CLK_ENABLE()              __HAL_RCC_GPIOB_CLK_ENABLE()
-#define EXTIx_PIN                      GPIO_PIN_4
-#define EXTIx_GPIO_PORT                GPIOB
-#define EXTIx_IRQn                     EXTI4_IRQn
+#define EXTIx_IRQHandler               EXTI9_5_IRQHandler
+#define EXTIx_IRQn                     EXTI9_5_IRQn
+#define EXTIx_CLK_ENABLE()              __HAL_RCC_GPIOA_CLK_ENABLE()
+#define EXTIx_PIN                      GPIO_PIN_8
+#define EXTIx_GPIO_PORT                GPIOA
 
 /* w5500 stuff */
 

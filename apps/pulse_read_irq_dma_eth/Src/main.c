@@ -598,7 +598,7 @@ static void EXTI_IRQHandler_Config(void)
   * @retval None
   */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
+{  
   if (GPIO_Pin == EXTIx_PIN) {
 
     // If first pulses detected, start timer
@@ -612,6 +612,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
     /* Increment detected pulses */
     detected_pulses++;
+  } else {
+    UART_Printf("HAL_GPIO_EXTI_Callback: %d\n\r", GPIO_Pin);
   }
 }
 
