@@ -213,37 +213,58 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
 {
 
   GPIO_InitTypeDef GPIO_InitStruct;
-  if(hspi->Instance==SPI1) {
+  if(hspi->Instance==SPIx) {
 
     // Enable clock for GPIOC port for W5500_CS_Pin
 
     /* USER CODE BEGIN SPI1_MspInit 0 */
 
     /* USER CODE END SPI1_MspInit 0 */
-    /* Peripheral clock enable */
-    __HAL_RCC_SPI1_CLK_ENABLE();
+
+    /*##-1- Enable peripherals and GPIO Clocks #################################*/
+    SPIx_SCK_GPIO_CLK_ENABLE();
+    SPIx_MISO_GPIO_CLK_ENABLE();
+    SPIx_MOSI_GPIO_CLK_ENABLE();
+
+    /* Enable SPI1 clock */
+    SPIx_CLK_ENABLE();
+
+    /* Enable DMA clock */
+    // SPIx_DMAx_CLK_ENABLE();
 
     /**SPI1 GPIO Configuration    
     PA5     ------> SPI1_SCK
     PA6     ------> SPI1_MISO
     PA7     ------> SPI1_MOSI 
     */
-    GPIO_InitStruct.Pin = GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    GPIO_InitStruct.Alternate = GPIO_AF5_SPI1;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+   
+    /*##-2- Configure peripheral GPIO ##########################################*/  
+    /* SPI SCK GPIO pin configuration  */
+    GPIO_InitStruct.Pin       = SPIx_SCK_PIN;
+    GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull      = GPIO_PULLDOWN;
+    GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = SPIx_SCK_AF;
+    HAL_GPIO_Init(SPIx_SCK_GPIO_PORT, &GPIO_InitStruct);
+
+    /* SPI MISO GPIO pin configuration  */
+    GPIO_InitStruct.Pin = SPIx_MISO_PIN;
+    GPIO_InitStruct.Alternate = SPIx_MISO_AF;
+    HAL_GPIO_Init(SPIx_MISO_GPIO_PORT, &GPIO_InitStruct);
+
+    /* SPI MOSI GPIO pin configuration  */
+    GPIO_InitStruct.Pin = SPIx_MOSI_PIN;
+    GPIO_InitStruct.Alternate = SPIx_MOSI_AF;
+    HAL_GPIO_Init(SPIx_MOSI_GPIO_PORT, &GPIO_InitStruct);
 
     __HAL_RCC_GPIOB_CLK_ENABLE();
-
+    
     /*Configure GPIO pin : W5500_CS_Pin */
     GPIO_InitStruct.Pin = W5500_CS_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(W5500_CS_GPIO_Port, &GPIO_InitStruct);
-
 
     /* USER CODE BEGIN SPI1_MspInit 1 */
 

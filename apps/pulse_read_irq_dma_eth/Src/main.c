@@ -174,7 +174,7 @@ int main(void)
 
   UART_Printf("UART configured\n\r");
 
-  /* Configure SPI1 */
+  /* Configure SPIx */
   SPI_Config();
 
   timestamps = (uint32_t*) malloc(timestamps_size*sizeof(uint32_t));
@@ -631,12 +631,12 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   }
 }
 
-/* SPI1 init function */
+/* SPIx init function */
 static void SPI_Config(void)
 {
 
-  /* SPI1 parameter configuration*/
-  hspi1.Instance = SPI1;
+  /* SPIx parameter configuration*/
+  hspi1.Instance = SPIx;
   hspi1.Init.Mode = SPI_MODE_MASTER;
   hspi1.Init.Direction = SPI_DIRECTION_2LINES;
   hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
