@@ -155,7 +155,7 @@ static void SystemClock_Config(void);
 static void Timer_Config(void);
 // static void Error_Handler(void);
 
-static void EXTI9_5_IRQHandler_Config(void);
+static void EXTI4_IRQHandler_Config(void);
 
 static void UART_Config(void);
 
@@ -194,7 +194,7 @@ int main(void)
   Timer_Config();
 
   /* Configure External line 13 (connected to PC.13 pin) in interrupt mode */
-  EXTI9_5_IRQHandler_Config();
+  EXTI4_IRQHandler_Config();
 
   /* Configure UART */
   UART_Config();
@@ -618,7 +618,7 @@ void UART_Printf_No_Block(const char* fmt, ...) {
   * @param  None
   * @retval None
   */
-static void EXTI9_5_IRQHandler_Config(void)
+static void EXTI4_IRQHandler_Config(void)
 {
   GPIO_InitTypeDef   GPIO_InitStructure;
 
