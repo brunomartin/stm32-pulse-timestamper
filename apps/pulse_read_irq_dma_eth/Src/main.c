@@ -70,11 +70,13 @@ void UART_Printf_No_Block(const char* fmt, ...);
 SPI_HandleTypeDef hspi1;
 
 /* transfer state */
-__IO uint32_t wTransferState = TRANSFER_WAIT;
+__IO uint8_t wTransferState = TRANSFER_COMPLETE;
+
+__IO uint8_t waitTransferDone = 1;
 
 /* w5500 stuff */
 
-volatile uint8_t ip_assigned = 0;
+__IO uint8_t ip_assigned = 0;
 
 // 1K should be enough, see https://forum.wiznet.io/t/topic/1612/2
 uint8_t dhcp_buffer[1024];
@@ -652,7 +654,7 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 {
   /* Turn LED2 on: Transfer in transmission/reception process is complete */
   BSP_LED_On(LED2); 
-  UART_Printf("HAL_SPI_TxCpltCallback.\r\n");
+  
   wTransferState = TRANSFER_COMPLETE;
 }
 
@@ -684,23 +686,25 @@ void W5500_ReadBuff(uint8_t* buff, uint16_t len) {
 
 void W5500_WriteBuff(uint8_t* buff, uint16_t len) {
 
-  HAL_SPI_Transmit(&hspi1, buff, len, HAL_MAX_DELAY);
-  return;
+  if(waitTransferDone) {
+    wTransferState = TRANSFER_WAIT;
+  }
 
-  wTransferState = TRANSFER_WAIT;
+  int8_t result = HAL_SPI_Transmit_DMA(&hspi1, buff, len);
+  while(result == HAL_BUSY) {
+    result = HAL_SPI_Transmit_DMA(&hspi1, buff, len);
+  }
 
-  UART_Printf("HAL_SPI_Transmit_DMA...\r\n");
-
-  if(HAL_SPI_Transmit_DMA(&hspi1, buff, len) != HAL_OK) {
+  if(result != HAL_OK) {
     /* Transfer error in transmission process */
-    UART_Printf("ERROR!\r\n");
+    UART_Printf("ERROR code: %d\r\n", result);
     Error_Handler();
   }
 
-  UART_Printf("HAL_SPI_Transmit_DMA waiting for wTransferState to change.\r\n");
-
   // Wait transfer is complete
-  while (wTransferState == TRANSFER_WAIT) {}
+  if(waitTransferDone) {
+    while (wTransferState == TRANSFER_WAIT) {}
+  }
 }
 
 uint8_t W5500_ReadByte(void) {
@@ -927,13 +931,15 @@ void udp_server_example(uint8_t* addr) {
   // bytes_to_send = 1*(1<<10);
   // bytes_to_send = timestamps_size*2;
 
-  for(int i=0;i<10;i++) {
+  waitTransferDone = 1;
+
+  for(int i=0;i<1000;i++) {
 
     uint16_t len = bytes_to_send;
     uint8_t* buff = (uint8_t*)timestamps;
 
     int32_t nbytes = sendto(udp_socket, buff, len, address, 8042);
-    // UART_Printf("%d: sendto Result: %d\r\n", i+1, nbytes);
+    UART_Printf("%d: sendto Result: %d\r\n", i+1, nbytes);
 
     // while(len > 0) {
     //     UART_Printf("Sending %d bytes...\r\n", len);
@@ -949,6 +955,8 @@ void udp_server_example(uint8_t* addr) {
 
     // HAL_Delay(10);
   }
+
+  waitTransferDone = 1;
 
   UART_Printf("Closing socket.\r\n");
   close(udp_socket);

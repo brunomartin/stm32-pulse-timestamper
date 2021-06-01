@@ -112,8 +112,8 @@
 #define SPIx_TX_DMA_CHANNEL              DMA1_Channel3
 #define SPIx_RX_DMA_CHANNEL              DMA1_Channel2
 
-#define SPIx_TX_DMA_REQUEST              DMA_REQUEST_0
-#define SPIx_RX_DMA_REQUEST              DMA_REQUEST_0
+#define SPIx_TX_DMA_REQUEST              DMA_REQUEST_1
+#define SPIx_RX_DMA_REQUEST              DMA_REQUEST_1
 
 /* Definition for SPIx's NVIC */
 #define SPIx_DMA_TX_IRQn                 DMA1_Channel3_IRQn
