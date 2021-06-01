@@ -232,7 +232,7 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     SPIx_CLK_ENABLE();
 
     /* Enable DMA clock */
-    // SPIx_DMAx_CLK_ENABLE();
+    SPIx_DMAx_CLK_ENABLE();
 
     /*##-2- Configure peripheral GPIO ##########################################*/  
     /* SPI SCK GPIO pin configuration  */

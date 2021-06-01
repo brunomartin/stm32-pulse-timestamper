@@ -44,7 +44,7 @@ void SysTick_Handler(void);
 
 void TIMx_IRQHandler(void);
 
-void EXTI4_IRQHandler(void);
+void EXTIx_IRQHandler(void);
 
 void USARTx_IRQHandler(void);
 void USARTx_DMA_RX_IRQHandler(void);

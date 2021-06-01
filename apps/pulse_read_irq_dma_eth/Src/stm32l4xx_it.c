@@ -206,9 +206,9 @@ void USARTx_DMA_TX_IRQHandler(void)
   * @param  None
   * @retval None
   */
-void EXTI4_IRQHandler(void)
+void EXTIx_IRQHandler(void)
 {
-  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_4);
+  HAL_GPIO_EXTI_IRQHandler(EXTIx_PIN);
 }
 
 /**

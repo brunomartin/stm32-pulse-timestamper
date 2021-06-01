@@ -136,6 +136,14 @@
 #define TIMx_IRQn                      TIM2_IRQn
 #define TIMx_IRQHandler                TIM2_IRQHandler
 
+/* Definition for exterior interrupts */
+
+#define EXTIx_IRQHandler               EXTI4_IRQHandler
+#define EXTIx_CLK_ENABLE()              __HAL_RCC_GPIOB_CLK_ENABLE()
+#define EXTIx_PIN                      GPIO_PIN_4
+#define EXTIx_GPIO_PORT                GPIOB
+#define EXTIx_IRQn                     EXTI4_IRQn
+
 /* w5500 stuff */
 
 #define W5500_CS_Pin                   GPIO_PIN_6

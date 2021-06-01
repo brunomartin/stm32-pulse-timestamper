@@ -73,61 +73,8 @@ SPI_HandleTypeDef hspi1;
 __IO uint32_t wTransferState = TRANSFER_WAIT;
 
 /* w5500 stuff */
-void W5500_Select(void) {
-    HAL_GPIO_WritePin(W5500_CS_GPIO_Port, GPIO_PIN_6, GPIO_PIN_RESET);
-}
-
-void W5500_Unselect(void) {
-    HAL_GPIO_WritePin(W5500_CS_GPIO_Port, GPIO_PIN_6, GPIO_PIN_SET);
-}
-
-void W5500_ReadBuff(uint8_t* buff, uint16_t len) {
-    HAL_SPI_Receive(&hspi1, buff, len, HAL_MAX_DELAY);
-}
-
-static void Error_Handler(void);
-
-void W5500_WriteBuff(uint8_t* buff, uint16_t len) {
-
-  HAL_SPI_Transmit(&hspi1, buff, len, HAL_MAX_DELAY);
-  return;
-
-  wTransferState = TRANSFER_WAIT;
-
-  UART_Printf("HAL_SPI_Transmit_DMA...\r\n");
-
-  if(HAL_SPI_Transmit_DMA(&hspi1, buff, len) != HAL_OK) {
-    /* Transfer error in transmission process */
-    UART_Printf("ERROR!\r\n");
-    Error_Handler();
-  }
-
-  UART_Printf("HAL_SPI_Transmit_DMA waiting for wTransferState to change.\r\n");
-
-  // Wait transfer is complete
-  while (wTransferState == TRANSFER_WAIT) {}
-}
-
-uint8_t W5500_ReadByte(void) {
-    uint8_t byte;
-    W5500_ReadBuff(&byte, sizeof(byte));
-    return byte;
-}
-
-void W5500_WriteByte(uint8_t byte) {
-    W5500_WriteBuff(&byte, sizeof(byte));
-}
 
 volatile uint8_t ip_assigned = 0;
-
-void Callback_IPAssigned(void) {
-    UART_Printf("Callback: IP assigned! Leased time: %d sec\r\n", getDHCPLeasetime());
-    ip_assigned = 1;
-}
- 
-void Callback_IPConflict(void) {
-    UART_Printf("Callback: IP conflict!\r\n");
-}
 
 // 1K should be enough, see https://forum.wiznet.io/t/topic/1612/2
 uint8_t dhcp_buffer[1024];
@@ -153,13 +100,22 @@ struct Statistics {
 /* Private function prototypes -----------------------------------------------*/
 static void SystemClock_Config(void);
 static void Timer_Config(void);
-// static void Error_Handler(void);
+static void Error_Handler(void);
 
-static void EXTI4_IRQHandler_Config(void);
+static void EXTI_IRQHandler_Config(void);
 
 static void UART_Config(void);
 
 static void SPI_Config(void);
+
+void W5500_Select(void);
+void W5500_Unselect(void);
+void W5500_ReadBuff(uint8_t* buff, uint16_t len);
+void W5500_WriteBuff(uint8_t* buff, uint16_t len);
+uint8_t W5500_ReadByte(void);
+void W5500_WriteByte(uint8_t byte);
+void Callback_IPAssigned(void); 
+void Callback_IPConflict(void);
 static void W5500_Config(void);
 
 static void ComputeStats(const uint32_t* timestamps,
@@ -194,7 +150,7 @@ int main(void)
   Timer_Config();
 
   /* Configure External line 13 (connected to PC.13 pin) in interrupt mode */
-  EXTI4_IRQHandler_Config();
+  EXTI_IRQHandler_Config();
 
   /* Configure UART */
   UART_Config();
@@ -618,22 +574,22 @@ void UART_Printf_No_Block(const char* fmt, ...) {
   * @param  None
   * @retval None
   */
-static void EXTI4_IRQHandler_Config(void)
+static void EXTI_IRQHandler_Config(void)
 {
   GPIO_InitTypeDef   GPIO_InitStructure;
 
   /* Enable GPIOC clock */
-  __HAL_RCC_GPIOB_CLK_ENABLE();
+  EXTIx_CLK_ENABLE();
 
   /* Configure PB.4 pin as input floating */
   GPIO_InitStructure.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStructure.Pull = GPIO_PULLDOWN;
-  GPIO_InitStructure.Pin = GPIO_PIN_4;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStructure);
+  GPIO_InitStructure.Pin = EXTIx_PIN;
+  HAL_GPIO_Init(EXTIx_GPIO_PORT, &GPIO_InitStructure);
 
   /* Enable and set EXTI line 4 Interrupt to the lowest priority */
-  HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
+  HAL_NVIC_SetPriority(EXTIx_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTIx_IRQn);
 }
 
 /**
@@ -643,7 +599,7 @@ static void EXTI4_IRQHandler_Config(void)
   */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-  if (GPIO_Pin == GPIO_PIN_4) {
+  if (GPIO_Pin == EXTIx_PIN) {
 
     // If first pulses detected, start timer
     if(detected_pulses == 0) {
@@ -709,6 +665,59 @@ void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
 {
   UART_Printf("HAL_SPI_ErrorCallback.\r\n");
   wTransferState = TRANSFER_ERROR;
+}
+
+/* w5500 stuff */
+void W5500_Select(void) {
+    HAL_GPIO_WritePin(W5500_CS_GPIO_Port, GPIO_PIN_6, GPIO_PIN_RESET);
+}
+
+void W5500_Unselect(void) {
+    HAL_GPIO_WritePin(W5500_CS_GPIO_Port, GPIO_PIN_6, GPIO_PIN_SET);
+}
+
+void W5500_ReadBuff(uint8_t* buff, uint16_t len) {
+    HAL_SPI_Receive(&hspi1, buff, len, HAL_MAX_DELAY);
+}
+
+void W5500_WriteBuff(uint8_t* buff, uint16_t len) {
+
+  HAL_SPI_Transmit(&hspi1, buff, len, HAL_MAX_DELAY);
+  return;
+
+  wTransferState = TRANSFER_WAIT;
+
+  UART_Printf("HAL_SPI_Transmit_DMA...\r\n");
+
+  if(HAL_SPI_Transmit_DMA(&hspi1, buff, len) != HAL_OK) {
+    /* Transfer error in transmission process */
+    UART_Printf("ERROR!\r\n");
+    Error_Handler();
+  }
+
+  UART_Printf("HAL_SPI_Transmit_DMA waiting for wTransferState to change.\r\n");
+
+  // Wait transfer is complete
+  while (wTransferState == TRANSFER_WAIT) {}
+}
+
+uint8_t W5500_ReadByte(void) {
+    uint8_t byte;
+    W5500_ReadBuff(&byte, sizeof(byte));
+    return byte;
+}
+
+void W5500_WriteByte(uint8_t byte) {
+    W5500_WriteBuff(&byte, sizeof(byte));
+}
+
+void Callback_IPAssigned(void) {
+    UART_Printf("Callback: IP assigned! Leased time: %d sec\r\n", getDHCPLeasetime());
+    ip_assigned = 1;
+}
+ 
+void Callback_IPConflict(void) {
+    UART_Printf("Callback: IP conflict!\r\n");
 }
 
 void http_request_example(uint8_t* addr);
