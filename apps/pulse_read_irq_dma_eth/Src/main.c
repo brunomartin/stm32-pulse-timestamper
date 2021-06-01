@@ -34,6 +34,11 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
+enum {
+	TRANSFER_WAIT,
+	TRANSFER_COMPLETE,
+	TRANSFER_ERROR
+};
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 
@@ -64,6 +69,9 @@ void UART_Printf_No_Block(const char* fmt, ...);
 /* SPI stuff*/
 SPI_HandleTypeDef hspi1;
 
+/* transfer state */
+__IO uint32_t wTransferState = TRANSFER_WAIT;
+
 /* w5500 stuff */
 void W5500_Select(void) {
     HAL_GPIO_WritePin(W5500_CS_GPIO_Port, GPIO_PIN_6, GPIO_PIN_RESET);
@@ -77,8 +85,27 @@ void W5500_ReadBuff(uint8_t* buff, uint16_t len) {
     HAL_SPI_Receive(&hspi1, buff, len, HAL_MAX_DELAY);
 }
 
+static void Error_Handler(void);
+
 void W5500_WriteBuff(uint8_t* buff, uint16_t len) {
-    HAL_SPI_Transmit(&hspi1, buff, len, HAL_MAX_DELAY);
+
+  HAL_SPI_Transmit(&hspi1, buff, len, HAL_MAX_DELAY);
+  return;
+
+  wTransferState = TRANSFER_WAIT;
+
+  UART_Printf("HAL_SPI_Transmit_DMA...\r\n");
+
+  if(HAL_SPI_Transmit_DMA(&hspi1, buff, len) != HAL_OK) {
+    /* Transfer error in transmission process */
+    UART_Printf("ERROR!\r\n");
+    Error_Handler();
+  }
+
+  UART_Printf("HAL_SPI_Transmit_DMA.\r\n");
+
+  // Wait transfer is complete
+  while (wTransferState == TRANSFER_WAIT) {}
 }
 
 uint8_t W5500_ReadByte(void) {
@@ -126,7 +153,7 @@ struct Statistics {
 /* Private function prototypes -----------------------------------------------*/
 static void SystemClock_Config(void);
 static void Timer_Config(void);
-static void Error_Handler(void);
+// static void Error_Handler(void);
 
 static void EXTI4_IRQHandler_Config(void);
 
@@ -653,6 +680,32 @@ static void SPI_Config(void)
     Error_Handler();
   }
 
+}
+
+/**
+  * @brief  Tx Transfer completed callback.
+  * @param  hspi: SPI handle
+  * @note   This example shows a simple way to report end of DMA Tx transfer, and 
+  *         you can add your own implementation. 
+  * @retval None
+  */
+void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+  /* Turn LED2 on: Transfer in transmission/reception process is complete */
+  BSP_LED_On(LED2);
+  wTransferState = TRANSFER_COMPLETE;
+}
+
+/**
+  * @brief  SPI error callbacks.
+  * @param  hspi: SPI handle
+  * @note   This example shows a simple way to report transfer error, and you can
+  *         add your own implementation.
+  * @retval None
+  */
+void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
+{
+  wTransferState = TRANSFER_ERROR;
 }
 
 void http_request_example(uint8_t* addr);

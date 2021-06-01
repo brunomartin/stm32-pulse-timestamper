@@ -40,6 +40,9 @@ extern TIM_HandleTypeDef    htim;
 /* UART handler declared in "main.c" file */
 extern UART_HandleTypeDef UartHandle;
 
+/* SPI handler declared in "main.c" file */
+extern SPI_HandleTypeDef hspi1;
+
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
 
@@ -206,6 +209,26 @@ void USARTx_DMA_TX_IRQHandler(void)
 void EXTI4_IRQHandler(void)
 {
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_4);
+}
+
+/**
+  * @brief  This function handles DMA Rx interrupt request.
+  * @param  None
+  * @retval None
+  */
+void SPIx_DMA_RX_IRQHandler(void)
+{
+  HAL_DMA_IRQHandler(hspi1.hdmarx);
+}
+
+/**
+  * @brief  This function handles DMA Tx interrupt request.
+  * @param  None
+  * @retval None
+  */
+void SPIx_DMA_TX_IRQHandler(void)
+{
+  HAL_DMA_IRQHandler(hspi1.hdmatx);
 }
 
 /**

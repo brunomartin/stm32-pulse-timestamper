@@ -32,6 +32,8 @@
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
+static DMA_HandleTypeDef hdma_tx;
+static DMA_HandleTypeDef hdma_rx;
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
 
@@ -266,6 +268,49 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(W5500_CS_GPIO_Port, &GPIO_InitStruct);
 
+    /*##-3- Configure the DMA ##################################################*/
+    /* Configure the DMA handler for Transmission process */
+    hdma_tx.Instance                 = SPIx_TX_DMA_CHANNEL;
+    hdma_tx.Init.Request             = SPIx_TX_DMA_REQUEST;
+    hdma_tx.Init.Direction           = DMA_MEMORY_TO_PERIPH;
+    hdma_tx.Init.PeriphInc           = DMA_PINC_DISABLE;
+    hdma_tx.Init.MemInc              = DMA_MINC_ENABLE;
+    hdma_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+    hdma_tx.Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
+    hdma_tx.Init.Mode                = DMA_NORMAL;
+    hdma_tx.Init.Priority            = DMA_PRIORITY_LOW;
+
+    HAL_DMA_Init(&hdma_tx);
+
+    /* Associate the initialized DMA handle to the the SPI handle */
+    __HAL_LINKDMA(hspi, hdmatx, hdma_tx);
+
+    /* Configure the DMA handler for Transmission process */
+    hdma_rx.Instance                 = SPIx_RX_DMA_CHANNEL;
+
+    hdma_rx.Init.Request             = SPIx_RX_DMA_REQUEST;
+    hdma_rx.Init.Direction           = DMA_PERIPH_TO_MEMORY;
+    hdma_rx.Init.PeriphInc           = DMA_PINC_DISABLE;
+    hdma_rx.Init.MemInc              = DMA_MINC_ENABLE;
+    hdma_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+    hdma_rx.Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
+    hdma_rx.Init.Mode                = DMA_NORMAL;
+    hdma_rx.Init.Priority            = DMA_PRIORITY_HIGH;
+
+    HAL_DMA_Init(&hdma_rx);
+
+    /* Associate the initialized DMA handle to the the SPI handle */
+    __HAL_LINKDMA(hspi, hdmarx, hdma_rx);
+    
+    /*##-4- Configure the NVIC for DMA #########################################*/ 
+    /* NVIC configuration for DMA transfer complete interrupt (SPI1_TX) */
+    HAL_NVIC_SetPriority(SPIx_DMA_TX_IRQn, 1, 1);
+    HAL_NVIC_EnableIRQ(SPIx_DMA_TX_IRQn);
+    
+    /* NVIC configuration for DMA transfer complete interrupt (SPI1_RX) */
+    HAL_NVIC_SetPriority(SPIx_DMA_RX_IRQn, 1, 0);
+    HAL_NVIC_EnableIRQ(SPIx_DMA_RX_IRQn);
+    
     /* USER CODE BEGIN SPI1_MspInit 1 */
 
     /* USER CODE END SPI1_MspInit 1 */
@@ -278,27 +323,30 @@ void HAL_SPI_MspDeInit(SPI_HandleTypeDef* hspi)
 
   if(hspi->Instance==SPI1)
   {
-  /* USER CODE BEGIN SPI1_MspDeInit 0 */
+    /*##-1- Reset peripherals ##################################################*/
+    SPIx_FORCE_RESET();
+    SPIx_RELEASE_RESET();
 
-  /* USER CODE END SPI1_MspDeInit 0 */
-    /* Peripheral clock disable */
-    SPIx_CLK_DISABLE();
-  
-    /**SPI1 GPIO Configuration    
-    PA5     ------> SPI1_SCK
-    PA6     ------> SPI1_MISO
-    PA7     ------> SPI1_MOSI 
-    */
+    /*##-2- Disable peripherals and GPIO Clocks ################################*/
+    /* Configure SPI SCK as alternate function  */
     HAL_GPIO_DeInit(SPIx_SCK_GPIO_PORT, SPIx_SCK_PIN);
+    /* Configure SPI MISO as alternate function  */
     HAL_GPIO_DeInit(SPIx_MISO_GPIO_PORT, SPIx_MISO_PIN);
+    /* Configure SPI MOSI as alternate function  */
     HAL_GPIO_DeInit(SPIx_MOSI_GPIO_PORT, SPIx_MOSI_PIN);
+
+    /*##-3- Disable the DMA ####################################################*/
+    /* De-Initialize the DMA associated to transmission process */
+    HAL_DMA_DeInit(&hdma_tx);
+    /* De-Initialize the DMA associated to reception process */
+    HAL_DMA_DeInit(&hdma_rx);
+
+    /*##-4- Disable the NVIC for DMA ###########################################*/
+    HAL_NVIC_DisableIRQ(SPIx_DMA_TX_IRQn);
+    HAL_NVIC_DisableIRQ(SPIx_DMA_RX_IRQn);
 
     W5500_CS_CLK_DISABLE();
     HAL_GPIO_DeInit(W5500_CS_GPIO_Port, W5500_CS_Pin);
-
-  /* USER CODE BEGIN SPI1_MspDeInit 1 */
-
-  /* USER CODE END SPI1_MspDeInit 1 */
   }
 
 }
