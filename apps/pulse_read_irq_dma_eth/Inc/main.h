@@ -88,6 +88,7 @@
 /* Definition for SPIx clock resources */
 #define SPIx                             SPI1
 #define SPIx_CLK_ENABLE()                __HAL_RCC_SPI1_CLK_ENABLE()
+#define SPIx_CLK_DISABLE()               __HAL_RCC_SPI1_CLK_DISABLE()
 #define SPIx_DMAx_CLK_ENABLE()           __HAL_RCC_DMA1_CLK_ENABLE()
 #define SPIx_SCK_GPIO_CLK_ENABLE()       __HAL_RCC_GPIOA_CLK_ENABLE()
 #define SPIx_MISO_GPIO_CLK_ENABLE()      __HAL_RCC_GPIOA_CLK_ENABLE()
@@ -139,6 +140,8 @@
 
 #define W5500_CS_Pin                   GPIO_PIN_6
 #define W5500_CS_GPIO_Port             GPIOB
+#define W5500_CS_CLK_ENABLE()          __HAL_RCC_GPIOA_CLK_ENABLE()
+#define W5500_CS_CLK_DISABLE()         __HAL_RCC_GPIOA_CLK_DISABLE()
 
 #define DHCP_SOCKET     0
 #define DNS_SOCKET      1
