@@ -112,8 +112,8 @@
 #define SPIx_TX_DMA_CHANNEL              DMA1_Channel3
 #define SPIx_RX_DMA_CHANNEL              DMA1_Channel2
 
-#define SPIx_TX_DMA_REQUEST              DMA_REQUEST_1
-#define SPIx_RX_DMA_REQUEST              DMA_REQUEST_1
+#define SPIx_TX_DMA_REQUEST              DMA_REQUEST_0
+#define SPIx_RX_DMA_REQUEST              DMA_REQUEST_0
 
 /* Definition for SPIx's NVIC */
 #define SPIx_DMA_TX_IRQn                 DMA1_Channel3_IRQn
@@ -140,8 +140,8 @@
 
 #define W5500_CS_Pin                   GPIO_PIN_6
 #define W5500_CS_GPIO_Port             GPIOB
-#define W5500_CS_CLK_ENABLE()          __HAL_RCC_GPIOA_CLK_ENABLE()
-#define W5500_CS_CLK_DISABLE()         __HAL_RCC_GPIOA_CLK_DISABLE()
+#define W5500_CS_CLK_ENABLE()          __HAL_RCC_GPIOB_CLK_ENABLE()
+#define W5500_CS_CLK_DISABLE()         __HAL_RCC_GPIOB_CLK_DISABLE()
 
 #define DHCP_SOCKET     0
 #define DNS_SOCKET      1

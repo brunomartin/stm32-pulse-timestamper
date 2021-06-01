@@ -102,7 +102,7 @@ void W5500_WriteBuff(uint8_t* buff, uint16_t len) {
     Error_Handler();
   }
 
-  UART_Printf("HAL_SPI_Transmit_DMA.\r\n");
+  UART_Printf("HAL_SPI_Transmit_DMA waiting for wTransferState to change.\r\n");
 
   // Wait transfer is complete
   while (wTransferState == TRANSFER_WAIT) {}
@@ -155,7 +155,7 @@ static void SystemClock_Config(void);
 static void Timer_Config(void);
 // static void Error_Handler(void);
 
-static void EXTI4_IRQHandler_Config(void);
+static void EXTI9_5_IRQHandler_Config(void);
 
 static void UART_Config(void);
 
@@ -194,7 +194,7 @@ int main(void)
   Timer_Config();
 
   /* Configure External line 13 (connected to PC.13 pin) in interrupt mode */
-  EXTI4_IRQHandler_Config();
+  EXTI9_5_IRQHandler_Config();
 
   /* Configure UART */
   UART_Config();
@@ -220,7 +220,8 @@ int main(void)
 
   uint32_t pulses_to_detect = 1e6;
   // pulses_to_detect = 1e7;
-  // pulses_to_detect = 1e5;
+  pulses_to_detect = 1e5;
+  pulses_to_detect = 1;
   // pulses_to_detect = 0;
   int pulses_step_size = timestamps_size/2;
 
@@ -617,7 +618,7 @@ void UART_Printf_No_Block(const char* fmt, ...) {
   * @param  None
   * @retval None
   */
-static void EXTI4_IRQHandler_Config(void)
+static void EXTI9_5_IRQHandler_Config(void)
 {
   GPIO_InitTypeDef   GPIO_InitStructure;
 
@@ -692,7 +693,8 @@ static void SPI_Config(void)
 void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 {
   /* Turn LED2 on: Transfer in transmission/reception process is complete */
-  BSP_LED_On(LED2);
+  BSP_LED_On(LED2); 
+  UART_Printf("HAL_SPI_TxCpltCallback.\r\n");
   wTransferState = TRANSFER_COMPLETE;
 }
 
@@ -705,6 +707,7 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
   */
 void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
 {
+  UART_Printf("HAL_SPI_ErrorCallback.\r\n");
   wTransferState = TRANSFER_ERROR;
 }
 
@@ -913,7 +916,7 @@ void udp_server_example(uint8_t* addr) {
   // bytes_to_send = 1*(1<<10);
   // bytes_to_send = timestamps_size*2;
 
-  for(int i=0;i<1000;i++) {
+  for(int i=0;i<10;i++) {
 
     uint16_t len = bytes_to_send;
     uint8_t* buff = (uint8_t*)timestamps;

@@ -234,12 +234,6 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     /* Enable DMA clock */
     // SPIx_DMAx_CLK_ENABLE();
 
-    /**SPI1 GPIO Configuration    
-    PA5     ------> SPI1_SCK
-    PA6     ------> SPI1_MISO
-    PA7     ------> SPI1_MOSI 
-    */
-   
     /*##-2- Configure peripheral GPIO ##########################################*/  
     /* SPI SCK GPIO pin configuration  */
     GPIO_InitStruct.Pin       = SPIx_SCK_PIN;
@@ -321,7 +315,7 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
 void HAL_SPI_MspDeInit(SPI_HandleTypeDef* hspi)
 {
 
-  if(hspi->Instance==SPI1)
+  if(hspi->Instance==SPIx)
   {
     /*##-1- Reset peripherals ##################################################*/
     SPIx_FORCE_RESET();
