@@ -931,34 +931,43 @@ void udp_server_start(uint8_t udp_socket, int server_port, uint8_t* address) {
   UART_Printf("Creating UDP socket...\r\n");
 
   int8_t result;
-	uint8_t testBuffer[] 	= "Wiznet Says Hi!\r\n";
-
-  size_t buffer_size = strlen(testBuffer);
+	uint8_t buffer[] 	= "Wiznet Says Hi!\r\n";
+  size_t buffer_size = strlen(buffer);
 
   // Set sock options before instanciation
   // SO_MSS max seems to be 1472
   uint16_t value = 1 << 10;
   setsockopt(udp_socket, SO_MSS, &value);
 
-  result = socket(udp_socket, Sn_MR_UDP, server_port, 0);
-  // result = socket(udp_socket, Sn_MR_UDP, 8042, SF_IO_NONBLOCK);
+  uint8_t flag = 0;
+  flag = SF_IO_NONBLOCK;
+  // flag = SF_BROAD_BLOCK;
+  // flag = SF_BROAD_BLOCK | SF_MULTI_ENABLE;
+  // flag = SF_BROAD_BLOCK | SF_IGMP_VER2 | SF_MULTI_ENABLE;
+
+  result = socket(udp_socket, Sn_MR_UDP, server_port, flag);
   UART_Printf("socket Result: %d\r\n", result);
 
   getsockopt(udp_socket, SO_MSS, &value);
   UART_Printf("SO_MSS: %d\r\n", value);
 
-  // setsockopt(udp_socket, SO_KEEPALIVESEND, NULL);
-
-  // memset(testBuffer, 0, strlen(testBuffer));
+  // UART_Printf("Sending broadcast message (size: %d)...\r\n", buffer_size);
+	// uint8_t broadcast_address[4] = { 255, 255, 255, 255 };
+	// int broadcast_port = 8040;
+  // flag = SF_BROAD_BLOCK | SF_IGMP_VER2 | SF_MULTI_ENABLE;
+  // result = socket(HTTP_SOCKET, Sn_MR_UDP, broadcast_port, flag);
+  // int32_t nbytes = sendto(HTTP_SOCKET, buffer, buffer_size,
+  //   broadcast_address, 8050);
+  // UART_Printf("%d bytes sent.\r\n", nbytes);
+  // close(HTTP_SOCKET);
 
   UART_Printf("Waiting for client...\r\n");
 
   uint16_t port;
-  result = recvfrom(udp_socket, testBuffer, buffer_size, address, &port);
-  while(result == 0) {
-    result = recvfrom(udp_socket, testBuffer, buffer_size, address, &port);
-  }
-  // result = recv(udp_socket, testBuffer, buffer_size);
+  do {
+    result = recvfrom(udp_socket, buffer, buffer_size, address, &port);
+  } while (result == 0);
+  
   UART_Printf("recvFrom Result: %d\r\n", result);
 
   UART_Printf("recvFrom address:  %d.%d.%d.%d\r\n",
@@ -966,7 +975,7 @@ void udp_server_start(uint8_t udp_socket, int server_port, uint8_t* address) {
   );
   UART_Printf("recvFrom port: %u\r\n", port);
 
-  UART_Printf("Received testBuffer: %s\r\n", testBuffer);
+  UART_Printf("Received testBuffer: %s\r\n", buffer);
 
 }
 
@@ -998,7 +1007,7 @@ void udp_server_example() {
   // bytes_to_send = timestamps_size*2;
 
   int32_t packes_to_send = 1000;
-  packes_to_send = 1000*1000;
+  // packes_to_send = 1000*1000;
 
   waitTxTransferDone = 1;
   waitRxTransferDone = 1;
@@ -1014,20 +1023,6 @@ void udp_server_example() {
     int32_t nbytes = sendto(udp_socket, buff, len, address, dest_port);
     // duration = __HAL_TIM_GET_COUNTER(&htim) - duration;
     // UART_Printf("%d: sendto Result: %d, duration: %lu\r\n", i+1, nbytes, duration);
-
-    // while(len > 0) {
-    //     UART_Printf("Sending %d bytes...\r\n", len);
-    //     int32_t nbytes = sendto(udp_socket, buff, len, address, 8042);
-    //     if(nbytes <= 0) {
-    //         UART_Printf("send() failed, %d returned\r\n", nbytes);
-    //         close(udp_socket);
-    //         return;
-    //     }
-    //     UART_Printf("%d bytes sent!\r\n", nbytes);
-    //     len -= nbytes;
-    // }
-
-    // HAL_Delay(10);
   }
 
   waitTxTransferDone = 1;
