@@ -179,7 +179,9 @@ int main(void)
   /* Configure leds */
   // BSP_LED_Init(LED2); // Conflict With SPI1 GPIOs
 
-  uint8_t send_udp_packets = 0;
+  uint8_t send_udp_packets = 1;
+  uint8_t compute_stats = 1;
+  uint8_t send_stats = 0;
 
   uint8_t udp_socket = UDP_SOCKET;
 	uint8_t address[4] = { 255, 255, 255, 255 };
@@ -221,29 +223,31 @@ int main(void)
     step_timestamps = timestamps;
     step_timestamps += pulses_last_step % timestamps_size;
 
-    // Compute statistics
-    ComputeStats(step_timestamps, pulses_step_size, &stats);
-
-    total_stats_count += stats.count;
-
     pulses_last_step = pulses_next_step;
     pulses_next_step += pulses_step_size;
 
-    // Initialize message to send
-    memset(aTxBuffer, 0, TXBUFFERSIZE);
-    
-    // Transmit results on serial link
-    sprintf(aTxBuffer, "%d: total: %0.2fs, count: %lu mean: %0.2fus, std: %0.2fus, min: %luus, max: %luus, rate: %0.2fkHz\n\r", send_id, stats.total/1e6, stats.count, stats.mean, stats.std_dev, stats.min, stats.max, 1/stats.mean*1e3);
+    if(compute_stats) {
+      // Compute statistics
+      ComputeStats(step_timestamps, pulses_step_size, &stats);
+
+      // Initialize message to send
+      memset(aTxBuffer, 0, TXBUFFERSIZE);
+      
+      // Transmit results on serial link
+      sprintf(aTxBuffer, "%d: total: %0.2fs, count: %lu mean: %0.2fus, std: %0.2fus, min: %luus, max: %luus, rate: %0.2fkHz\n\r", send_id, stats.total/1e6, stats.count, stats.mean, stats.std_dev, stats.min, stats.max, 1/stats.mean*1e3);
+    }
+
+    if(send_stats) {
+      /*##-3- Start the transmission process #####################################*/
+      /* While the UART in reception process, user can transmit data through 
+        "aTxBuffer" buffer */
+      if(HAL_UART_Transmit_DMA(&UartHandle, (uint8_t*)aTxBuffer, TXBUFFERSIZE)!= HAL_OK)
+      {
+        Error_Handler();
+      }
+    }
 
     send_id++;
-
-    /*##-3- Start the transmission process #####################################*/
-    /* While the UART in reception process, user can transmit data through 
-      "aTxBuffer" buffer */
-    if(HAL_UART_Transmit_DMA(&UartHandle, (uint8_t*)aTxBuffer, TXBUFFERSIZE)!= HAL_OK)
-    {
-      Error_Handler();
-    }
 
     if(send_udp_packets) {
       uint8_t* udp_packet = (uint8_t*) step_timestamps;
@@ -254,14 +258,15 @@ int main(void)
   }
 
   if(send_udp_packets) {
-    udp_server_stop(udp_socket);
+    // Program won't go further if we stop udp server
+    // udp_server_stop(udp_socket);
   }
 
   // Initialize message to send
   memset(aTxBuffer, 0, TXBUFFERSIZE);
   
   // Transmit results on serial link
-  sprintf(aTxBuffer, "total_stats_count: %lu\n\r", total_stats_count);
+  sprintf(aTxBuffer, "detected_pulses: %lu\n\r", detected_pulses);
 
   /*##-3- Start the transmission process #####################################*/
   /* While the UART in reception process, user can transmit data through 
@@ -285,17 +290,9 @@ int main(void)
      blinking according to the following pattern: a double flash every half-second */
   while (UartReady != SET)
   {
-      BSP_LED_On(LED2); 
-      HAL_Delay(100);
-      BSP_LED_Off(LED2); 
-      HAL_Delay(100);
-      BSP_LED_On(LED2); 
-      HAL_Delay(100);
-      BSP_LED_Off(LED2); 
-      HAL_Delay(500); 
   }
 
-  BSP_LED_On(LED2); /* stop blink and keeps ON */
+  // BSP_LED_On(LED2); /* stop blink and keeps ON */
 
   /*##-5- Send the received Buffer ###########################################*/
   /* Even if use of HAL IT based services is no more possible, use of HAL Polling based services
@@ -309,7 +306,7 @@ int main(void)
   memset(aTxBuffer, 0, TXBUFFERSIZE);
   
   // Transmit results on serial link
-  sprintf(aTxBuffer, "total_stats_count: %lu\n\r", total_stats_count);
+  sprintf(aTxBuffer, "detected_pulses: %lu\n\r", detected_pulses);
   
   /*##-6- Send the End Message ###############################################*/  
   if(HAL_UART_Transmit(&UartHandle, (uint8_t*)aTxBuffer, TXBUFFERSIZE, 1000)!= HAL_OK)
