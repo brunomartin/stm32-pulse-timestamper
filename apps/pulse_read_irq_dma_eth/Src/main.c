@@ -70,7 +70,8 @@ void UART_Printf_No_Block(const char* fmt, ...);
 SPI_HandleTypeDef hspi1;
 
 /* transfer state */
-__IO uint8_t wTransferState = TRANSFER_COMPLETE;
+__IO uint8_t wTxTransferState = TRANSFER_COMPLETE;
+__IO uint8_t wRxTransferState = TRANSFER_COMPLETE;
 
 __IO uint8_t waitTransferDone = 1;
 
@@ -631,7 +632,7 @@ static void SPI_Config(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -655,7 +656,22 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
   /* Turn LED2 on: Transfer in transmission/reception process is complete */
   BSP_LED_On(LED2); 
   
-  wTransferState = TRANSFER_COMPLETE;
+  wTxTransferState = TRANSFER_COMPLETE;
+}
+
+/**
+  * @brief  Rx Transfer completed callback.
+  * @param  hspi: SPI handle
+  * @note   This example shows a simple way to report end of DMA Rx transfer, and 
+  *         you can add your own implementation. 
+  * @retval None
+  */
+void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+  /* Turn LED2 on: Transfer in transmission/reception process is complete */
+  BSP_LED_On(LED2); 
+  
+  wRxTransferState = TRANSFER_COMPLETE;
 }
 
 /**
@@ -668,42 +684,64 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
 {
   UART_Printf("HAL_SPI_ErrorCallback.\r\n");
-  wTransferState = TRANSFER_ERROR;
+  wTxTransferState = TRANSFER_ERROR;
+  wRxTransferState = TRANSFER_ERROR;
 }
 
 /* w5500 stuff */
 void W5500_Select(void) {
-    HAL_GPIO_WritePin(W5500_CS_GPIO_Port, GPIO_PIN_6, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(W5500_CS_GPIO_Port, GPIO_PIN_6, GPIO_PIN_RESET);
 }
 
 void W5500_Unselect(void) {
-    HAL_GPIO_WritePin(W5500_CS_GPIO_Port, GPIO_PIN_6, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(W5500_CS_GPIO_Port, GPIO_PIN_6, GPIO_PIN_SET);
 }
 
 void W5500_ReadBuff(uint8_t* buff, uint16_t len) {
-    HAL_SPI_Receive(&hspi1, buff, len, HAL_MAX_DELAY);
-}
 
-void W5500_WriteBuff(uint8_t* buff, uint16_t len) {
+  // HAL_SPI_Receive(&hspi1, buff, len, HAL_MAX_DELAY);
 
   if(waitTransferDone) {
-    wTransferState = TRANSFER_WAIT;
+    wRxTransferState = TRANSFER_WAIT;
   }
 
-  int8_t result = HAL_SPI_Transmit_DMA(&hspi1, buff, len);
-  while(result == HAL_BUSY) {
-    result = HAL_SPI_Transmit_DMA(&hspi1, buff, len);
-  }
+  int8_t result;
+  do {
+    result = HAL_SPI_Receive_DMA(&hspi1, buff, len);
+  } while(result == HAL_BUSY);
 
   if(result != HAL_OK) {
     /* Transfer error in transmission process */
-    UART_Printf("ERROR code: %d\r\n", result);
+    UART_Printf("HAL_SPI_Receive_DMA ERROR code: %d\r\n", result);
     Error_Handler();
   }
 
   // Wait transfer is complete
   if(waitTransferDone) {
-    while (wTransferState == TRANSFER_WAIT) {}
+    while (wRxTransferState == TRANSFER_WAIT) {}
+  }
+}
+
+void W5500_WriteBuff(uint8_t* buff, uint16_t len) {
+
+  if(waitTransferDone) {
+    wTxTransferState = TRANSFER_WAIT;
+  }
+
+  int8_t result;
+  do {
+    result = HAL_SPI_Transmit_DMA(&hspi1, buff, len);
+  } while(result == HAL_BUSY);
+
+  if(result != HAL_OK) {
+    /* Transfer error in transmission process */
+    UART_Printf("HAL_SPI_Transmit_DMA ERROR code: %d\r\n", result);
+    Error_Handler();
+  }
+
+  // Wait transfer is complete
+  if(waitTransferDone) {
+    while (wTxTransferState == TRANSFER_WAIT) {}
   }
 }
 
