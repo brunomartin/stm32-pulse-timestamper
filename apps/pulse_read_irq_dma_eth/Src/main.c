@@ -122,6 +122,9 @@ void Callback_IPAssigned(void);
 void Callback_IPConflict(void);
 static void W5500_Config(void);
 
+void udp_server_start(uint8_t udp_socket, int server_port, uint8_t* address);
+void udp_server_stop(uint8_t udp_socket);
+
 static void ComputeStats(const uint32_t* timestamps,
   uint32_t size, struct Statistics* stats);
 
@@ -174,7 +177,23 @@ int main(void)
   W5500_Config();
   
   /* Configure leds */
-  BSP_LED_Init(LED2);
+  // BSP_LED_Init(LED2); // Conflict With SPI1 GPIOs
+
+  uint8_t send_udp_packets = 0;
+
+  uint8_t udp_socket = UDP_SOCKET;
+	uint8_t address[4] = { 255, 255, 255, 255 };
+
+  int server_port = 8041;
+  int dest_port = 8042;
+
+  udp_server_start(udp_socket, server_port, address);
+
+  UART_Printf("Client address:   %d.%d.%d.%d\r\n",
+      address[0], address[1], address[2], address[3]
+  );
+
+  UART_Printf("Destination port: %d\r\n", dest_port);
 
   UART_Printf("****READY TO RECEIVE PULSES****\n\r");
 
@@ -226,7 +245,16 @@ int main(void)
       Error_Handler();
     }
 
+    if(send_udp_packets) {
+      uint8_t* udp_packet = (uint8_t*) step_timestamps;
+      int32_t nbytes = sendto(udp_socket, udp_packet, pulses_step_size/2, address, dest_port);
+    }
+
     // Don't wait for transmission unless we lost some data
+  }
+
+  if(send_udp_packets) {
+    udp_server_stop(udp_socket);
   }
 
   // Initialize message to send
@@ -655,7 +683,7 @@ static void SPI_Config(void)
 void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 {
   /* Turn LED2 on: Transfer in transmission/reception process is complete */
-  BSP_LED_On(LED2); 
+  // BSP_LED_On(LED2);
   
   wTxTransferState = TRANSFER_COMPLETE;
 }
@@ -670,7 +698,7 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 {
   /* Turn LED2 on: Transfer in transmission/reception process is complete */
-  BSP_LED_On(LED2); 
+  // BSP_LED_On(LED2);
   
   wRxTransferState = TRANSFER_COMPLETE;
 }
@@ -862,7 +890,7 @@ void W5500_Config() {
     wizphy_setphyconf(&phy_conf);
 
     // http_request_example(addr);
-    udp_server_example();
+    // udp_server_example();
 }
 
 void http_request_example(uint8_t* addr) {
@@ -940,7 +968,7 @@ void udp_server_start(uint8_t udp_socket, int server_port, uint8_t* address) {
   setsockopt(udp_socket, SO_MSS, &value);
 
   uint8_t flag = 0;
-  flag = SF_IO_NONBLOCK;
+  // flag = SF_IO_NONBLOCK;
   // flag = SF_BROAD_BLOCK;
   // flag = SF_BROAD_BLOCK | SF_MULTI_ENABLE;
   // flag = SF_BROAD_BLOCK | SF_IGMP_VER2 | SF_MULTI_ENABLE;
