@@ -1,6 +1,7 @@
 import socket
 import struct
 import time
+import math
 
 UDP_IP = ""
 UDP_PORT = 8042
@@ -53,11 +54,26 @@ while True:
 
   transfer_duration = transfer_end_time - first_fragment_time
 
-  first = struct.unpack('I', data[:4])
-  last = struct.unpack('I', data[-4:])
-  
+  # convert data to uint32 array
+  timestamps = list(struct.unpack('I' * int(len(data) / 4), data))
+  durations = [(timestamps[x+1] - timestamps[x]) for x in range(len(timestamps)-1)]
+
+  average = 0
+  min = durations[0]
+  max = durations[0]
+  for duration in durations:
+    average += duration
+    min = duration if duration < min else min
+    max = duration if duration > max else max
+  average /= len(durations)
+
+  std_dev = 0
+  for duration in durations:
+    std_dev += (duration - average)**2
+  std_dev /= len(durations)
+  std_dev = math.sqrt(std_dev)
+
   print("{}: fragments: {}, waited: {:.2f}ms, transfer:{:.2f}ms".format(
     count, fragment_count, wait_duration*1000, transfer_duration*1000))
 
-  print("  first: {}, last: {}".format(first, last))
-  
+  print("  average:{:.2f}us, dev:{:.2f}us, min: {}us, max: {}us".format(average, std_dev, min, max))

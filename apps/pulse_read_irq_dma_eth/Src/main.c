@@ -86,7 +86,7 @@ uint8_t dhcp_buffer[1024];
 uint8_t dns_buffer[1024];
 
 // Detection variables
-__IO uint64_t  detected_pulses = 0;
+__IO uint32_t  detected_pulses = 0;
 
 // Set timestamps vector size, be aware of the total RAM size (96kB on this one)
 // w5500 has max 16kB of Tx buffer to give to max 8 sockets
@@ -190,7 +190,8 @@ int main(void)
   uint8_t send_stats = 1;
 
   uint8_t udp_socket = UDP_SOCKET;
-	uint8_t address[4] = { 255, 255, 255, 255 };
+	// uint8_t address[4] = { 255, 255, 255, 255 };
+	uint8_t address[4] = { 192, 168, 1, 15 };
 
   int server_port = 8041;
   int dest_port = 8042;
@@ -221,7 +222,7 @@ int main(void)
   uint32_t* current_timestamps = NULL;
 
   uint32_t pulses_sent = 0;
-  uint64_t current_detected_pulses = 0;
+  uint32_t current_detected_pulses = 0;
 
   int send_id = 0;
   uint32_t total_stats_count = 0;
@@ -295,7 +296,7 @@ int main(void)
     pulses_sent += pulses_step_size;
 
     // Mark sent timestamps
-    memset(current_timestamps, 0xFF, pulses_step_size*sizeof(uint32_t));
+    // memset(current_timestamps, 0xFF, pulses_step_size*sizeof(uint32_t));
 
     // Don't wait for transmission unless we lost some data
   }
@@ -382,7 +383,8 @@ static void Timer_Config(void)
     htim.Init.Prescaler         = (uint32_t)(SystemCoreClock / 1e6) - 1;
     htim.Init.CounterMode       = TIM_COUNTERMODE_UP;
     htim.Init.Period            = 0xFFFFFFFF;
-    // htim.Init.Period            = 100000;
+    htim.Init.Period            = 4000000000;
+    htim.Init.Period            = 40000000;
     htim.Init.ClockDivision     = TIM_CLOCKDIVISION_DIV1;
     htim.Init.RepetitionCounter = 0x0;
 
@@ -995,21 +997,25 @@ void udp_server_start(uint8_t udp_socket, int server_port, uint8_t* address) {
   // UART_Printf("%d bytes sent.\r\n", nbytes);
   // close(HTTP_SOCKET);
 
-  UART_Printf("Waiting for client...\r\n");
+  if(*(uint32_t*)address == 0xFFFFFFFF) {
 
-  uint16_t port;
-  do {
-    result = recvfrom(udp_socket, buffer, buffer_size, address, &port);
-  } while (result == 0);
-  
-  UART_Printf("recvFrom Result: %d\r\n", result);
+    UART_Printf("Waiting for client...\r\n");
 
-  UART_Printf("recvFrom address:  %d.%d.%d.%d\r\n",
-      address[0], address[1], address[2], address[3]
-  );
-  UART_Printf("recvFrom port: %u\r\n", port);
+    uint16_t port;
+    do {
+      result = recvfrom(udp_socket, buffer, buffer_size, address, &port);
+    } while (result == 0);
+    
+    UART_Printf("recvFrom Result: %d\r\n", result);
 
-  UART_Printf("Received testBuffer: %s\r\n", buffer);
+    UART_Printf("recvFrom address:  %d.%d.%d.%d\r\n",
+        address[0], address[1], address[2], address[3]
+    );
+    UART_Printf("recvFrom port: %u\r\n", port);
+
+    UART_Printf("Received testBuffer: %s\r\n", buffer);
+
+  }
 
 }
 

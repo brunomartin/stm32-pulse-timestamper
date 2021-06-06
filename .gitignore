@@ -1,5 +1,6 @@
-# IDEA
-.idea/*
+# python
+.idea/
+venv/
 
 # CMake
 cmake-build*/*
@@ -16,3 +17,6 @@ Cube/*
 docs/html
 **/*doxygen*.db
 *.DS_Store
+
+# MacOS files
+._*
