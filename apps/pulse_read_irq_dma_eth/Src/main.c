@@ -86,7 +86,7 @@ uint8_t dhcp_buffer[1024];
 uint8_t dns_buffer[1024];
 
 // Detection variables
-__IO uint32_t  detected_pulses = 0;
+__IO uint64_t  detected_pulses = 0;
 
 // Set timestamps vector size, be aware of the total RAM size (96kB on this one)
 // w5500 has max 16kB of Tx buffer to give to max 8 sockets
@@ -175,6 +175,9 @@ int main(void)
   for(size_t i=0;i<timestamps_size;i++) {
     timestamps[i] = (uint32_t) i;
   }
+
+  // Init timestamp buffer with magic number
+  memset(timestamps, 0xFF, timestamps_size*sizeof(uint32_t));
   
   /* Configure w5500 */
   W5500_Config();
@@ -215,29 +218,50 @@ int main(void)
   struct Statistics stats;
   int pulses_last_step = 0;
   int pulses_next_step = pulses_step_size;
-  uint32_t* step_timestamps = timestamps;
+  uint32_t* current_timestamps = NULL;
+
+  uint32_t pulses_sent = 0;
+  uint64_t current_detected_pulses = 0;
 
   int send_id = 0;
   uint32_t total_stats_count = 0;
 
-  /* Reset transmission flag */
-  UartReady = RESET;
+  uint32_t current_time = __HAL_TIM_GET_COUNTER(&htim); 
+  uint32_t last_print_time = current_time;
 
   /* Wait all pulses have been detected */
   while (detected_pulses < pulses_to_detect) {
 
     // Wait for a part of pulse to be detected and compute stats
-    while (detected_pulses < pulses_next_step) {}
+    while (current_detected_pulses = detected_pulses < pulses_next_step) {
 
-    step_timestamps = timestamps;
-    step_timestamps += pulses_last_step % timestamps_size;
+      current_time = __HAL_TIM_GET_COUNTER(&htim);
+      uint32_t duration = (current_time - last_print_time);
+      if(current_time - last_print_time < 0) {
+        UART_Printf("Timer wrapped\r\n");
+      }
+
+      if(duration > 2000000) {
+        UART_Printf("Print: current_time: %d\r\n", current_time);
+        UART_Printf("Print: pulses_last_step: %d\r\n", pulses_last_step);
+        UART_Printf("Print: detected_pulses: %d\r\n", detected_pulses);
+        last_print_time = __HAL_TIM_GET_COUNTER(&htim);
+      }
+
+      // Delay of 1ms to let the MCU free, not too long to
+      // avoid loosing packet to send
+      HAL_Delay(1);
+    }
+
+    current_timestamps = timestamps;
+    current_timestamps += pulses_last_step % timestamps_size;
 
     pulses_last_step = pulses_next_step;
     pulses_next_step += pulses_step_size;
 
     if(compute_stats) {
       // Compute statistics
-      ComputeStats(step_timestamps, pulses_step_size, &stats);
+      ComputeStats(current_timestamps, pulses_step_size, &stats);
 
       // Initialize message to send
       memset(aTxBuffer, 0, TXBUFFERSIZE);
@@ -259,21 +283,19 @@ int main(void)
       }
 
       UART_Printf("%s", aTxBuffer);
-
-      /*##-3- Start the transmission process #####################################*/
-      /* While the UART in reception process, user can transmit data through 
-        "aTxBuffer" buffer */
-      // if(HAL_UART_Transmit_DMA(&UartHandle, (uint8_t*)aTxBuffer, TXBUFFERSIZE)!= HAL_OK)
-      // {
-      //   Error_Handler();
-      // }
+      // UART_Printf_No_Block("%s", aTxBuffer);
     }
 
     if(send_udp_packets) {
-      uint8_t* udp_packet = (uint8_t*) step_timestamps;
-      uint32_t udp_packet_size = pulses_step_size*4;
+      uint8_t* udp_packet = (uint8_t*) current_timestamps;
+      uint32_t udp_packet_size = pulses_step_size*sizeof(uint32_t);
       int32_t nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, dest_port);
     }
+    
+    pulses_sent += pulses_step_size;
+
+    // Mark sent timestamps
+    memset(current_timestamps, 0xFF, pulses_step_size*sizeof(uint32_t));
 
     // Don't wait for transmission unless we lost some data
   }
@@ -285,59 +307,9 @@ int main(void)
 
   UART_Printf("packets sent: %d\r\n", send_id);
   UART_Printf("pulses_to_detect: %d\r\n", pulses_to_detect);
+  UART_Printf("detected_pulses: %d\r\n", detected_pulses);
 
-  // Initialize message to send
-  memset(aTxBuffer, 0, TXBUFFERSIZE);
-  
-  // Transmit results on serial link
-  sprintf(aTxBuffer, "detected_pulses: %lu\n\r", detected_pulses);
-
-  /*##-3- Start the transmission process #####################################*/
-  /* While the UART in reception process, user can transmit data through 
-    "aTxBuffer" buffer */
-  if(HAL_UART_Transmit_DMA(&UartHandle, (uint8_t*)aTxBuffer, TXBUFFERSIZE)!= HAL_OK)
-  {
-    Error_Handler();
-  }
-  
-  /*##-4- Wait for the end of the transfer ###################################*/
-  while (UartReady != SET)
-  {
-  }
-
-  /* Reset transmission flag */
-  UartReady = RESET;
-
-
-  /*##-3- Wait for the end of the transfer ###################################*/
-  /* While waiting for message to come from the other board, LED2 is
-     blinking according to the following pattern: a double flash every half-second */
-  while (UartReady != SET)
-  {
-  }
-
-  // BSP_LED_On(LED2); /* stop blink and keeps ON */
-
-  /*##-5- Send the received Buffer ###########################################*/
-  /* Even if use of HAL IT based services is no more possible, use of HAL Polling based services
-     (as Transmit in polling mode) is still possible. */
-  if(HAL_UART_Transmit(&UartHandle, (uint8_t*)aRxBuffer, RXBUFFERSIZE, 1000)!= HAL_OK)
-  {
-    /* Transfer error in transmission process */
-    Error_Handler();
-  }
-    // Initialize message to send
-  memset(aTxBuffer, 0, TXBUFFERSIZE);
-  
-  // Transmit results on serial link
-  sprintf(aTxBuffer, "detected_pulses: %lu\n\r", detected_pulses);
-  
-  /*##-6- Send the End Message ###############################################*/  
-  if(HAL_UART_Transmit(&UartHandle, (uint8_t*)aTxBuffer, TXBUFFERSIZE, 1000)!= HAL_OK)
-  {
-    /* Transfer error in transmission process */
-    Error_Handler();
-  }
+  UART_Printf("Enter infinite loop\r\n");
   
   /* Infinite loop */
   while (1)
@@ -603,6 +575,8 @@ void UART_Printf(const char* fmt, ...) {
   va_start(args, fmt);
   vsnprintf(buff, sizeof(buff), fmt, args);
 
+  UartReady = RESET;
+
   if(HAL_UART_Transmit_DMA(&UartHandle, (uint8_t*)buff, strlen(buff))!= HAL_OK)
   {
     Error_Handler();
@@ -611,14 +585,19 @@ void UART_Printf(const char* fmt, ...) {
   va_end(args);
 
   while (UartReady != SET) {}
-  UartReady = RESET;
 }
 
 void UART_Printf_No_Block(const char* fmt, ...) {
-
+  char buff[256];
   va_list args;
   va_start(args, fmt);
-  UART_Printf(fmt, args);
+  vsnprintf(buff, sizeof(buff), fmt, args);
+
+  if(HAL_UART_Transmit_DMA(&UartHandle, (uint8_t*)buff, strlen(buff))!= HAL_OK)
+  {
+    Error_Handler();
+  }
+
   va_end(args);
 }
 
@@ -665,6 +644,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
     /* Increment detected pulses */
     detected_pulses++;
+
+    if(detected_pulses%1024 == 0) {
+      // UART_Printf_No_Block("detected_pulses%%1024\n\r");
+    }
+
   } else {
     UART_Printf("HAL_GPIO_EXTI_Callback: %d\n\r", GPIO_Pin);
   }
