@@ -198,8 +198,8 @@ int main(void)
 
   uint8_t udp_socket = UDP_SOCKET;
 	// uint8_t address[4] = { 255, 255, 255, 255 };
-	// uint8_t address[4] = { 192, 168, 1, 15 };
-	uint8_t address[4] = { 192, 168, 1, 40 };
+	uint8_t address[4] = { 192, 168, 1, 15 };
+	// uint8_t address[4] = { 192, 168, 1, 40 };
 
   int server_port = 8041;
   int dest_port = 8042;

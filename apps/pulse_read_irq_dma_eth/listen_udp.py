@@ -31,11 +31,16 @@ counter_precision = 0.1
 # UDP packet size
 packet_size = fragment_count*fragment_size
 
-# byte array in which to store UDP fragments
+# initialize arrays to store UDP fragments
 data = bytearray(packet_size)
-part = bytearray(fragment_size)
-first = -1
-last = -1
+
+timestamps = []
+for i in range(int(packet_size/4)):
+  timestamps.append(0.)
+
+durations = []
+for i in range(int(packet_size/4)):
+  durations.append(0.)
 
 wait_duration_start = time.time()
 first_fragment_time = time.time()
@@ -49,8 +54,7 @@ while True:
     data_start = fragment * fragment_size
     data_end = data_start + fragment_size
 
-    part, addr = sock.recvfrom(fragment_size)
-    data[data_start:data_end] = part
+    data[data_start:data_end], addr = sock.recvfrom(fragment_size)
 
     if fragment == 0:
       first_fragment_time = time.time()
