@@ -96,6 +96,7 @@ __IO uint32_t  detected_pulses = 0;
 // w5500 has max 16kB of Tx buffer to give to max 8 sockets
 // A second detection line is scheduled so 8kB of Tx buffer
 // 16kB for the line is ok, this 4*1024 uint32
+// 8kB for the line is ok, this 2*1024 uint32
 const uint32_t timestamps_size = 4*1024;
 uint32_t* timestamps;
 
@@ -192,6 +193,9 @@ int main(void)
   /* Configure leds */
   // BSP_LED_Init(LED2); // Conflict With SPI1 GPIOs
 
+  /* Start timer now */
+  HAL_TIM_Base_Start(&htim);
+
   uint8_t send_udp_packets = 1;
   uint8_t compute_stats = 0;
   uint8_t send_stats = 0;
@@ -225,7 +229,9 @@ int main(void)
   // pulses_to_detect = 2147483648; // 2^31
 
   int pulses_step_size = timestamps_size/2;
-  pulses_step_size = timestamps_size/4;
+  // pulses_step_size = timestamps_size/4;
+  // pulses_step_size = timestamps_size/8;
+  // pulses_step_size = timestamps_size/16;
   // pulses_step_size = 1024/4;
   // pulses_step_size = 1024/16;
 
@@ -247,6 +253,19 @@ int main(void)
   uint8_t* udp_packet;
   uint32_t udp_packet_size;
   int32_t nbytes;
+
+
+  UART_Printf("Filling RAM and Tx buffer...\n\r");
+  // Fill Tx buffer
+  for(int i=0;i<timestamps_size;i+=pulses_step_size) {
+
+    current_timestamps = timestamps;
+    current_timestamps += i;
+    
+    udp_packet = (uint8_t*) current_timestamps;
+    udp_packet_size = pulses_step_size*sizeof(uint32_t);
+    nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, 65535);
+  }
 
   UART_Printf("****READY TO RECEIVE PULSES****\n\r");
 
@@ -675,21 +694,12 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {  
   if (GPIO_Pin == EXTIx_PIN) {
 
-    // If first pulses detected, start timer
-    if(detected_pulses == 0) {
-      HAL_TIM_Base_Start(&htim);
-    }
-
     // And store counter value
     timestamps[detected_pulses%timestamps_size] =
       __HAL_TIM_GET_COUNTER(&htim);
 
     /* Increment detected pulses */
     detected_pulses++;
-
-    if(detected_pulses%1024 == 0) {
-      // UART_Printf_No_Block("detected_pulses%%1024\n\r");
-    }
 
   } else {
     UART_Printf("HAL_GPIO_EXTI_Callback: %d\n\r", GPIO_Pin);
@@ -857,18 +867,18 @@ void W5500_Config() {
     reg_wizchip_spiburst_cbfunc(W5500_ReadBuff, W5500_WriteBuff);
 
     UART_Printf("Calling wizchip_init()...\r\n");
-    // Sum for each must not exceed 16
+    // Sum for each must not exceed 16 for each direction
     // Vector size must be 8 for w5500 (_WIZCHIP_SOCK_NUM_)
 
-    uint8_t tx_buff_sizes[] = {2, 2, 2, 2, 2, 2, 2, 2};
-    uint8_t rx_buff_sizes[] = {2, 2, 2, 2, 2, 2, 2, 2};
-    // uint8_t tx_buff_sizes[] = {2, 2, 2, 8, 0, 0, 0, 0};
-    // uint8_t rx_buff_sizes[] = {2, 2, 2, 8, 0, 0, 0, 0};
+    // uint8_t tx_buff_sizes[] = {2, 2, 4, 2, 2, 2, 2, 2};
+    // uint8_t rx_buff_sizes[] = {2, 2, 4, 2, 2, 2, 2, 2};
+    uint8_t tx_buff_sizes[] = {2, 2, 2, 4, 0, 0, 0, 0};
+    uint8_t rx_buff_sizes[] = {2, 2, 2, 2, 0, 0, 0, 0};
     if(wizchip_init(tx_buff_sizes, rx_buff_sizes) != 0) {
       UART_Printf("wizchip_init() ERROR !\r\n");
     }
 
-    setSn_TXBUF_SIZE(UDP_SOCKET, 16);
+    // setSn_TXBUF_SIZE(UDP_SOCKET, 16);
 
     UART_Printf("Calling DHCP_init()...\r\n");
     wiz_NetInfo net_info = {

@@ -20,7 +20,7 @@ count = 0
 fragment_size = 1024
 
 # UDP packet fragment count
-fragment_count = 4
+fragment_count = 1
 
 # timestamp max in unit
 counter_period = 4000000000
@@ -74,6 +74,11 @@ while True:
   # convert data to uint32 array
   timestamps = list(struct.unpack('I' * int(len(data) / 4), data))
 
+  # Check if any bad value
+  for i in range(len(timestamps)):
+    if timestamps[i] >= counter_period:
+      print("!!!! timestamps[{}]: 0xFFFFFFFF".format(i))
+
   # unwrap timestamps according to counter period
   for i in range(1, len(timestamps)):
     while timestamps[i] - timestamps[i-1] < -counter_period/2:
@@ -117,3 +122,11 @@ while True:
   # print statistics
   print("  average:{:.2f}us, dev:{:.2f}us, min: {:.2f}us, max: {:.2f}us, rate: {:.2f}kHz".format(
     average, std_dev, min, max, rate*1000))
+
+  if std_dev > 20:
+    for i in range(len(timestamps)):
+      duration = 0
+      if i > 0:
+        duration = timestamps[i] - timestamps[i-1]
+
+      print("{}: {}, {}".format(i, timestamps[i], duration))
