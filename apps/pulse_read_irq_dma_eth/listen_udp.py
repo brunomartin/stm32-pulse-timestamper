@@ -20,7 +20,7 @@ count = 0
 fragment_size = 1024
 
 # UDP packet fragment count
-fragment_count = 1
+fragment_count = 4
 
 # timestamp max in unit
 counter_period = 4000000000
