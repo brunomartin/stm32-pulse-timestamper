@@ -224,7 +224,7 @@ int main(void)
   pulses_to_detect = 16*timestamps_size;
   pulses_to_detect = 262144; // 2^18
   pulses_to_detect = 1048576; // 2^20
-  // pulses_to_detect = 4194304; // 2^22
+  pulses_to_detect = 4194304; // 2^22
   // pulses_to_detect = 16777216; // 2^24
   // pulses_to_detect = 2147483648; // 2^31
 
