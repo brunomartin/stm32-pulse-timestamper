@@ -304,7 +304,7 @@ int main(void)
     pulses_sent += pulses_step_size;
 
     // Mark sent timestamps
-    // memset(current_timestamps, 0xFF, pulses_step_size*sizeof(uint32_t));
+    memset(current_timestamps, 0xFF, pulses_step_size*sizeof(uint32_t));
 
     // Don't wait for transmission unless we lost some data
   }
