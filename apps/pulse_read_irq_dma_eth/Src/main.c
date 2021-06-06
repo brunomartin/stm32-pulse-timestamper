@@ -89,7 +89,10 @@ uint8_t dns_buffer[1024];
 __IO uint32_t  detected_pulses = 0;
 
 // Set timestamps vector size, be aware of the total RAM size (96kB on this one)
-const uint32_t timestamps_size = 20000;
+// w5500 has max 16kB of Tx buffer to give to max 8 sockets
+// A second detection line is scheduled so 8kB of Tx buffer
+// 16kB for the line is ok, this 4*1024 uint32
+const uint32_t timestamps_size = 4*1024;
 uint32_t* timestamps;
 
 struct Statistics {
@@ -180,8 +183,8 @@ int main(void)
   // BSP_LED_Init(LED2); // Conflict With SPI1 GPIOs
 
   uint8_t send_udp_packets = 1;
-  uint8_t compute_stats = 1;
-  uint8_t send_stats = 0;
+  uint8_t compute_stats = 0;
+  uint8_t send_stats = 1;
 
   uint8_t udp_socket = UDP_SOCKET;
 	uint8_t address[4] = { 255, 255, 255, 255 };
@@ -204,7 +207,10 @@ int main(void)
   pulses_to_detect = 1e5;
   // pulses_to_detect = 1;
   // pulses_to_detect = 0;
+  pulses_to_detect = 4*timestamps_size;
+
   int pulses_step_size = timestamps_size/2;
+  pulses_step_size = timestamps_size/4;
 
   struct Statistics stats;
   int pulses_last_step = 0;
@@ -213,6 +219,9 @@ int main(void)
 
   int send_id = 0;
   uint32_t total_stats_count = 0;
+
+  /* Reset transmission flag */
+  UartReady = RESET;
 
   /* Wait all pulses have been detected */
   while (detected_pulses < pulses_to_detect) {
@@ -237,21 +246,33 @@ int main(void)
       sprintf(aTxBuffer, "%d: total: %0.2fs, count: %lu mean: %0.2fus, std: %0.2fus, min: %luus, max: %luus, rate: %0.2fkHz\n\r", send_id, stats.total/1e6, stats.count, stats.mean, stats.std_dev, stats.min, stats.max, 1/stats.mean*1e3);
     }
 
+    send_id++;
+
     if(send_stats) {
+
+      if(!compute_stats) {
+        // Initialize message to send
+        memset(aTxBuffer, 0, TXBUFFERSIZE);
+        
+        // Transmit results on serial link
+        sprintf(aTxBuffer, "%d: stats not computed\n\r", send_id);
+      }
+
+      UART_Printf("%s", aTxBuffer);
+
       /*##-3- Start the transmission process #####################################*/
       /* While the UART in reception process, user can transmit data through 
         "aTxBuffer" buffer */
-      if(HAL_UART_Transmit_DMA(&UartHandle, (uint8_t*)aTxBuffer, TXBUFFERSIZE)!= HAL_OK)
-      {
-        Error_Handler();
-      }
+      // if(HAL_UART_Transmit_DMA(&UartHandle, (uint8_t*)aTxBuffer, TXBUFFERSIZE)!= HAL_OK)
+      // {
+      //   Error_Handler();
+      // }
     }
-
-    send_id++;
 
     if(send_udp_packets) {
       uint8_t* udp_packet = (uint8_t*) step_timestamps;
-      int32_t nbytes = sendto(udp_socket, udp_packet, pulses_step_size/2, address, dest_port);
+      uint32_t udp_packet_size = pulses_step_size*4;
+      int32_t nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, dest_port);
     }
 
     // Don't wait for transmission unless we lost some data
@@ -261,6 +282,9 @@ int main(void)
     // Program won't go further if we stop udp server
     // udp_server_stop(udp_socket);
   }
+
+  UART_Printf("packets sent: %d\r\n", send_id);
+  UART_Printf("pulses_to_detect: %d\r\n", pulses_to_detect);
 
   // Initialize message to send
   memset(aTxBuffer, 0, TXBUFFERSIZE);
@@ -962,6 +986,7 @@ void udp_server_start(uint8_t udp_socket, int server_port, uint8_t* address) {
   // Set sock options before instanciation
   // SO_MSS max seems to be 1472
   uint16_t value = 1 << 10;
+  // value = 1 << 12;
   setsockopt(udp_socket, SO_MSS, &value);
 
   uint8_t flag = 0;

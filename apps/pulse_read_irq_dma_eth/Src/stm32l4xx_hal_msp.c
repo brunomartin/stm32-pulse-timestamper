@@ -121,15 +121,15 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart)
     
   /*##-4- Configure the NVIC for DMA #########################################*/
   /* NVIC configuration for DMA transfer complete interrupt (USART1_TX) */
-  HAL_NVIC_SetPriority(USARTx_DMA_TX_IRQn, 1, 1);
+  HAL_NVIC_SetPriority(USARTx_DMA_TX_IRQn, 2, 1);
   HAL_NVIC_EnableIRQ(USARTx_DMA_TX_IRQn);
     
   /* NVIC configuration for DMA transfer complete interrupt (USART1_RX) */
-  HAL_NVIC_SetPriority(USARTx_DMA_RX_IRQn, 1, 0);
+  HAL_NVIC_SetPriority(USARTx_DMA_RX_IRQn, 2, 0);
   HAL_NVIC_EnableIRQ(USARTx_DMA_RX_IRQn);
   
   /* NVIC for USART1, to catch the TX complete */
-  HAL_NVIC_SetPriority(USARTx_IRQn, 1, 1);
+  HAL_NVIC_SetPriority(USARTx_IRQn, 2, 1);
   HAL_NVIC_EnableIRQ(USARTx_IRQn);
 }
 
