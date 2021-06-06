@@ -194,7 +194,7 @@ int main(void)
 
   uint8_t send_udp_packets = 1;
   uint8_t compute_stats = 0;
-  uint8_t send_stats = 1;
+  uint8_t send_stats = 0;
 
   uint8_t udp_socket = UDP_SOCKET;
 	// uint8_t address[4] = { 255, 255, 255, 255 };
@@ -212,17 +212,22 @@ int main(void)
 
   UART_Printf("Destination port: %d\r\n", dest_port);
 
-  UART_Printf("****READY TO RECEIVE PULSES****\n\r");
-
   uint32_t pulses_to_detect = 1e6;
   // pulses_to_detect = 1e7;
   pulses_to_detect = 1e5;
   // pulses_to_detect = 1;
   // pulses_to_detect = 0;
   pulses_to_detect = 16*timestamps_size;
+  pulses_to_detect = 262144; // 2^18
+  // pulses_to_detect = 1048576; // 2^20
+  // pulses_to_detect = 4194304; // 2^22
+  // pulses_to_detect = 16777216; // 2^24
+  // pulses_to_detect = 2147483648; // 2^31
 
   int pulses_step_size = timestamps_size/2;
   pulses_step_size = timestamps_size/4;
+  // pulses_step_size = 1024/4;
+  // pulses_step_size = 1024/16;
 
   struct Statistics stats;
   int pulses_last_step = 0;
@@ -237,6 +242,13 @@ int main(void)
 
   uint32_t current_time_ms = GetTimerTimeMs();
   uint32_t last_print_time_ms = current_time_ms;
+  uint32_t duration;
+
+  uint8_t* udp_packet;
+  uint32_t udp_packet_size;
+  int32_t nbytes;
+
+  UART_Printf("****READY TO RECEIVE PULSES****\n\r");
 
   /* Wait all pulses have been detected */
   while (detected_pulses < pulses_to_detect) {
@@ -245,8 +257,8 @@ int main(void)
     while (current_detected_pulses = detected_pulses < pulses_next_step) {
 
       current_time_ms = GetTimerTimeMs();
-      uint32_t duration = (current_time_ms - last_print_time_ms);
-      if(current_time_ms - last_print_time_ms < 0) {
+      duration = (current_time_ms - last_print_time_ms);
+      if(current_time_ms < last_print_time_ms) {
         UART_Printf("Timer wrapped\r\n");
       }
 
@@ -296,9 +308,9 @@ int main(void)
     }
 
     if(send_udp_packets) {
-      uint8_t* udp_packet = (uint8_t*) current_timestamps;
-      uint32_t udp_packet_size = pulses_step_size*sizeof(uint32_t);
-      int32_t nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, dest_port);
+      udp_packet = (uint8_t*) current_timestamps;
+      udp_packet_size = pulses_step_size*sizeof(uint32_t);
+      nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, dest_port);
     }
     
     pulses_sent += pulses_step_size;

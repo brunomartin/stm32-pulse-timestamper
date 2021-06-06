@@ -72,7 +72,7 @@ while True:
 
   # unwrap timestamps according to counter period
   for i in range(1, len(timestamps)):
-    while timestamps[i] - timestamps[i-1] < -counter_period:
+    while timestamps[i] - timestamps[i-1] < -counter_period/2:
       timestamps[i] += counter_period
 
   # UDP packet may not arrived in order
@@ -106,7 +106,9 @@ while True:
   std_dev /= len(durations)
   std_dev = math.sqrt(std_dev)
 
-  rate = 1/average
+  rate = math.nan
+  if average != 0:
+    rate = 1/average
 
   # print statistics
   print("  average:{:.2f}us, dev:{:.2f}us, min: {:.2f}us, max: {:.2f}us, rate: {:.2f}kHz".format(
