@@ -44,7 +44,11 @@ enum {
 
 /* Timer declaration */
 TIM_HandleTypeDef htim = {0};
-uint32_t uwPrescalerValue;
+// uint32_t uwPrescalerFreq = 80000000; // timer precision is 12.5ns
+// uint32_t uwPrescalerFreq =  1000000; // timer precision is 12.5 * 80 = 1000ns
+uint32_t uwPrescalerFreq = 10000000; // timer precision is 12.5 * 8 = 100ns
+
+uint32_t uwPeriod = 4000000000 - 1; // timer will wrapped before 4M
 
 /* UART handler declaration */
 UART_HandleTypeDef UartHandle;
@@ -133,6 +137,9 @@ static void ComputeStats(const uint32_t* timestamps,
 
 static void HAL_Delay_us(uint32_t ticks);
 
+static uint32_t GetTimerTimeUs();
+static uint32_t GetTimerTimeMs();
+
 /* Private functions ---------------------------------------------------------*/
 
 /**
@@ -191,7 +198,8 @@ int main(void)
 
   uint8_t udp_socket = UDP_SOCKET;
 	// uint8_t address[4] = { 255, 255, 255, 255 };
-	uint8_t address[4] = { 192, 168, 1, 15 };
+	// uint8_t address[4] = { 192, 168, 1, 15 };
+	uint8_t address[4] = { 192, 168, 1, 40 };
 
   int server_port = 8041;
   int dest_port = 8042;
@@ -211,7 +219,7 @@ int main(void)
   pulses_to_detect = 1e5;
   // pulses_to_detect = 1;
   // pulses_to_detect = 0;
-  pulses_to_detect = 4*timestamps_size;
+  pulses_to_detect = 16*timestamps_size;
 
   int pulses_step_size = timestamps_size/2;
   pulses_step_size = timestamps_size/4;
@@ -227,8 +235,8 @@ int main(void)
   int send_id = 0;
   uint32_t total_stats_count = 0;
 
-  uint32_t current_time = __HAL_TIM_GET_COUNTER(&htim); 
-  uint32_t last_print_time = current_time;
+  uint32_t current_time_ms = GetTimerTimeMs();
+  uint32_t last_print_time_ms = current_time_ms;
 
   /* Wait all pulses have been detected */
   while (detected_pulses < pulses_to_detect) {
@@ -236,17 +244,17 @@ int main(void)
     // Wait for a part of pulse to be detected and compute stats
     while (current_detected_pulses = detected_pulses < pulses_next_step) {
 
-      current_time = __HAL_TIM_GET_COUNTER(&htim);
-      uint32_t duration = (current_time - last_print_time);
-      if(current_time - last_print_time < 0) {
+      current_time_ms = GetTimerTimeMs();
+      uint32_t duration = (current_time_ms - last_print_time_ms);
+      if(current_time_ms - last_print_time_ms < 0) {
         UART_Printf("Timer wrapped\r\n");
       }
 
-      if(duration > 2000000) {
-        UART_Printf("Print: current_time: %d\r\n", current_time);
+      if(duration > 2000) {
+        UART_Printf("Print: current_time_ms: %d\r\n", current_time_ms);
         UART_Printf("Print: pulses_last_step: %d\r\n", pulses_last_step);
         UART_Printf("Print: detected_pulses: %d\r\n", detected_pulses);
-        last_print_time = __HAL_TIM_GET_COUNTER(&htim);
+        last_print_time_ms = GetTimerTimeMs();
       }
 
       // Delay of 1ms to let the MCU free, not too long to
@@ -378,13 +386,14 @@ static void Timer_Config(void)
 {
 
   /* Compute the prescaler value to have TIMx counter clock equal to 1MHz */
+  /* SystemCoreClock is 80000000 Max is 80000000 <=> 12.5ns */
 
     htim.Instance               = TIMx;
-    htim.Init.Prescaler         = (uint32_t)(SystemCoreClock / 1e6) - 1;
+    htim.Init.Prescaler         = (uint32_t)(SystemCoreClock / uwPrescalerFreq) - 1;
     htim.Init.CounterMode       = TIM_COUNTERMODE_UP;
     htim.Init.Period            = 0xFFFFFFFF;
-    htim.Init.Period            = 4000000000;
-    htim.Init.Period            = 40000000;
+    htim.Init.Period            = uwPeriod;
+    // htim.Init.Period            = 40000000 - 1;
     htim.Init.ClockDivision     = TIM_CLOCKDIVISION_DIV1;
     htim.Init.RepetitionCounter = 0x0;
 
@@ -415,6 +424,25 @@ static void Timer_Config(void)
 void TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   // Do something
+}
+
+
+/**
+  * @brief  Get Timer Time in us according to TIMx counter
+  * @retval Elapsed us since la TIMx reset
+  */
+static uint32_t GetTimerTimeUs() {
+  uint32_t result = __HAL_TIM_GET_COUNTER(&htim);
+  result /= uwPrescalerFreq / 1e6;
+  return result;
+}
+
+/**
+  * @brief  Get Timer Time in ms according to TIMx counter
+  * @retval Elapsed us since la TIMx reset
+  */
+static uint32_t GetTimerTimeMs() {
+  return GetTimerTimeUs() / 1000;
 }
 
 /**

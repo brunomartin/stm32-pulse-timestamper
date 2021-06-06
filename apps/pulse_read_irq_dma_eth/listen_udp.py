@@ -1,3 +1,7 @@
+# This script listen uint32_t timestamps array on UDP port
+# To avoid UDP packet mixing, it must be executed on the network
+# "near" the pulse timestamper, e.g., not on wifi
+
 import socket
 import struct
 import time
@@ -17,6 +21,12 @@ fragment_size = 1024
 
 # UDP packet fragment count
 fragment_count = 4
+
+# timestamp max in unit
+counter_period = 4000000000
+
+# timestamp precision in us
+counter_precision = 0.1
 
 # UDP packet size
 packet_size = fragment_count*fragment_size
@@ -47,17 +57,40 @@ while True:
 
   count += 1
 
+  # compute timings involved
   transfer_end_time = time.time()
-
   wait_duration = transfer_end_time - wait_duration_start
-  wait_duration_start = time.time()
-
+  wait_duration_start = transfer_end_time
   transfer_duration = transfer_end_time - first_fragment_time
+
+  # print it for information
+  print("{}: fragments: {}, waited: {:.2f}ms, transfer:{:.2f}ms".format(
+    count, fragment_count, wait_duration*1000, transfer_duration*1000))
 
   # convert data to uint32 array
   timestamps = list(struct.unpack('I' * int(len(data) / 4), data))
-  durations = [(timestamps[x+1] - timestamps[x]) for x in range(len(timestamps)-1)]
 
+  # unwrap timestamps according to counter period
+  for i in range(1, len(timestamps)):
+    while timestamps[i] - timestamps[i-1] < -counter_period:
+      timestamps[i] += counter_period
+
+  # UDP packet may not arrived in order
+  # Nervertheless, they came from the same line
+  # so we can sort them
+  timestamps.sort()
+
+  # convert timestamps to float
+  for i in range(len(timestamps)):
+    timestamps[i] = float(timestamps[i])
+
+  # compute durations from timestamps
+  durations = [(timestamps[i] - timestamps[i-1]) for i in range(1, len(timestamps)-1)]
+
+  # apply conversion according to precision
+  durations = [ duration*counter_precision for duration in durations]
+
+  # compute statistics
   average = 0
   min = durations[0]
   max = durations[0]
@@ -73,7 +106,8 @@ while True:
   std_dev /= len(durations)
   std_dev = math.sqrt(std_dev)
 
-  print("{}: fragments: {}, waited: {:.2f}ms, transfer:{:.2f}ms".format(
-    count, fragment_count, wait_duration*1000, transfer_duration*1000))
+  rate = 1/average
 
-  print("  average:{:.2f}us, dev:{:.2f}us, min: {}us, max: {}us".format(average, std_dev, min, max))
+  # print statistics
+  print("  average:{:.2f}us, dev:{:.2f}us, min: {:.2f}us, max: {:.2f}us, rate: {:.2f}kHz".format(
+    average, std_dev, min, max, rate*1000))
