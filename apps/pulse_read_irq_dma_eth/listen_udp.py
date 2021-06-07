@@ -35,12 +35,12 @@ packet_size = fragment_count*fragment_size
 data = bytearray(packet_size)
 
 timestamps = []
-for i in range(int(packet_size/4)):
-  timestamps.append(0.)
+new_timestamps = []
+last_timestamps = []
+
+concatenat_timestamps = True
 
 durations = []
-for i in range(int(packet_size/4)):
-  durations.append(0.)
 
 wait_duration_start = time.time()
 first_fragment_time = time.time()
@@ -72,7 +72,14 @@ while True:
     count, fragment_count, wait_duration*1000, transfer_duration*1000))
 
   # convert data to uint32 array
-  timestamps = list(struct.unpack('I' * int(len(data) / 4), data))
+  new_timestamps = list(struct.unpack('I' * int(len(data) / 4), data))
+
+  if concatenat_timestamps:
+    # concatenate with last timestamps to ensure continuity
+    timestamps = last_timestamps + new_timestamps
+    last_timestamps = new_timestamps
+  else:
+    timestamps = new_timestamps
 
   # Check if any bad value
   for i in range(len(timestamps)):
@@ -87,7 +94,7 @@ while True:
   # UDP packet may not arrived in order
   # Nervertheless, they came from the same line
   # so we can sort them
-  timestamps.sort()
+  # timestamps.sort()
 
   # convert timestamps to float
   for i in range(len(timestamps)):
@@ -120,13 +127,9 @@ while True:
     rate = 1/average
 
   # print statistics
-  print("  average:{:.2f}us, dev:{:.2f}us, min: {:.2f}us, max: {:.2f}us, rate: {:.2f}kHz".format(
+  print("  count: {}".format(len(durations)))
+  print("  average: {:.2f}us, dev: {:.2f}us, min: {:.2f}us, max: {:.2f}us, rate: {:.2f}kHz".format(
     average, std_dev, min, max, rate*1000))
 
-  if std_dev > 20:
-    for i in range(len(timestamps)):
-      duration = 0
-      if i > 0:
-        duration = timestamps[i] - timestamps[i-1]
-
-      print("{}: {}, {}".format(i, timestamps[i], duration))
+  if std_dev > 10:
+    raise Exception("std_dev > 10")
