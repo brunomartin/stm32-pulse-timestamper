@@ -127,7 +127,6 @@ while True:
     rate = 1/average
 
   # print statistics
-  print("  count: {}".format(len(durations)))
   print("  average: {:.2f}us, dev: {:.2f}us, min: {:.2f}us, max: {:.2f}us, rate: {:.2f}kHz".format(
     average, std_dev, min, max, rate*1000))
 

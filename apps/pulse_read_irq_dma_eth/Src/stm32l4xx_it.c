@@ -212,6 +212,16 @@ void EXTIx_IRQHandler(void)
 }
 
 /**
+  * @brief  This function handles external lines 10 to 15 interrupt request.
+  * @param  None
+  * @retval None
+  */
+void EXTI9_5_IRQHandler(void)
+{
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_9);
+}
+
+/**
   * @brief  This function handles DMA Rx interrupt request.
   * @param  None
   * @retval None

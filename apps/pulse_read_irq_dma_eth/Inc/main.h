@@ -32,8 +32,6 @@
 #include "stm32l4xx_hal.h"
 #include "stm32l4xx_nucleo.h"
 
-#include "stm32l4xx_hal_tim.h"
-
 #include "socket.h"
 #include "dhcp.h"
 #include "dns.h"

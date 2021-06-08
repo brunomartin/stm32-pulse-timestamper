@@ -223,8 +223,8 @@ int main(void)
   // pulses_to_detect = 0;
   pulses_to_detect = 16*timestamps_size;
   pulses_to_detect = 262144; // 2^18
-  pulses_to_detect = 1048576; // 2^20
-  pulses_to_detect = 4194304; // 2^22
+  // pulses_to_detect = 1048576; // 2^20
+  // pulses_to_detect = 4194304; // 2^22
   // pulses_to_detect = 16777216; // 2^24
   // pulses_to_detect = 2147483648; // 2^31
 
@@ -683,6 +683,16 @@ static void EXTI_IRQHandler_Config(void)
   /* Enable and set EXTI line 4 Interrupt to the lowest priority */
   HAL_NVIC_SetPriority(EXTIx_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTIx_IRQn);
+
+  /* Configure PB.4 pin as input floating */
+  GPIO_InitStructure.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStructure.Pull = GPIO_PULLDOWN;
+  GPIO_InitStructure.Pin = GPIO_PIN_9;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+  /* Enable and set EXTI line 4 Interrupt to the lowest priority */
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 4, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 }
 
 /**
@@ -701,8 +711,17 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     /* Increment detected pulses */
     detected_pulses++;
 
-  } else {
-    UART_Printf("HAL_GPIO_EXTI_Callback: %d\n\r", GPIO_Pin);
+    if(detected_pulses%10000 == 0) {
+      EXTI_HandleTypeDef exti;
+      exti.Line = EXTI_LINE_9;
+      HAL_EXTI_GenerateSWI(&exti);
+    }
+
+  } else if (GPIO_Pin == GPIO_PIN_9) {
+
+    // reset detected_pulses for test
+    // detected_pulses = 0;
+    UART_Printf("HAL_GPIO_EXTI_Callback: on GPIO_PIN_9\n\r");
   }
 }
 

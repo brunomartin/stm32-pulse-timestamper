@@ -296,6 +296,26 @@
   #include "stm32l4xx_hal_dac.h"
 #endif /* HAL_DAC_MODULE_ENABLED */
 
+#ifdef HAL_DCMI_MODULE_ENABLED
+  #include "stm32l4xx_hal_dcmi.h"
+#endif /* HAL_DCMI_MODULE_ENABLED */
+
+#ifdef HAL_DMA2D_MODULE_ENABLED
+  #include "stm32l4xx_hal_dma2d.h"
+#endif /* HAL_DMA2D_MODULE_ENABLED */
+
+#ifdef HAL_DSI_MODULE_ENABLED
+  #include "stm32l4xx_hal_dsi.h"
+#endif /* HAL_DSI_MODULE_ENABLED */
+
+#ifdef HAL_EXTI_MODULE_ENABLED
+  #include "stm32l4xx_hal_exti.h"
+#endif /* HAL_EXTI_MODULE_ENABLED */
+
+#ifdef HAL_GFXMMU_MODULE_ENABLED
+  #include "stm32l4xx_hal_gfxmmu.h"
+#endif /* HAL_GFXMMU_MODULE_ENABLED */
+
 #ifdef HAL_FIREWALL_MODULE_ENABLED
   #include "stm32l4xx_hal_firewall.h"
 #endif /* HAL_FIREWALL_MODULE_ENABLED */
@@ -304,21 +324,21 @@
   #include "stm32l4xx_hal_flash.h"
 #endif /* HAL_FLASH_MODULE_ENABLED */
 
-#ifdef HAL_SRAM_MODULE_ENABLED
-  #include "stm32l4xx_hal_sram.h"
-#endif /* HAL_SRAM_MODULE_ENABLED */
+#ifdef HAL_HASH_MODULE_ENABLED
+  #include "stm32l4xx_hal_hash.h"
+#endif /* HAL_HASH_MODULE_ENABLED */
 
-#ifdef HAL_NOR_MODULE_ENABLED
-  #include "stm32l4xx_hal_nor.h"
-#endif /* HAL_NOR_MODULE_ENABLED */
-
-#ifdef HAL_NAND_MODULE_ENABLED
-  #include "stm32l4xx_hal_nand.h"
-#endif /* HAL_NAND_MODULE_ENABLED */
+#ifdef HAL_HCD_MODULE_ENABLED
+  #include "stm32l4xx_hal_hcd.h"
+#endif /* HAL_HCD_MODULE_ENABLED */
 
 #ifdef HAL_I2C_MODULE_ENABLED
   #include "stm32l4xx_hal_i2c.h"
 #endif /* HAL_I2C_MODULE_ENABLED */
+
+#ifdef HAL_IRDA_MODULE_ENABLED
+  #include "stm32l4xx_hal_irda.h"
+#endif /* HAL_IRDA_MODULE_ENABLED */
 
 #ifdef HAL_IWDG_MODULE_ENABLED
   #include "stm32l4xx_hal_iwdg.h"
@@ -332,9 +352,41 @@
   #include "stm32l4xx_hal_lptim.h"
 #endif /* HAL_LPTIM_MODULE_ENABLED */
 
+#ifdef HAL_LTDC_MODULE_ENABLED
+  #include "stm32l4xx_hal_ltdc.h"
+#endif /* HAL_LTDC_MODULE_ENABLED */
+
+#ifdef HAL_MMC_MODULE_ENABLED
+  #include "stm32l4xx_hal_mmc.h"
+#endif /* HAL_MMC_MODULE_ENABLED */
+
+#ifdef HAL_NAND_MODULE_ENABLED
+  #include "stm32l4xx_hal_nand.h"
+#endif /* HAL_NAND_MODULE_ENABLED */
+
+#ifdef HAL_NOR_MODULE_ENABLED
+  #include "stm32l4xx_hal_nor.h"
+#endif /* HAL_NOR_MODULE_ENABLED */
+
 #ifdef HAL_OPAMP_MODULE_ENABLED
   #include "stm32l4xx_hal_opamp.h"
 #endif /* HAL_OPAMP_MODULE_ENABLED */
+
+#ifdef HAL_OSPI_MODULE_ENABLED
+  #include "stm32l4xx_hal_ospi.h"
+#endif /* HAL_OSPI_MODULE_ENABLED */
+
+#ifdef HAL_PCD_MODULE_ENABLED
+  #include "stm32l4xx_hal_pcd.h"
+#endif /* HAL_PCD_MODULE_ENABLED */
+
+#ifdef HAL_PKA_MODULE_ENABLED
+  #include "stm32l4xx_hal_pka.h"
+#endif /* HAL_PKA_MODULE_ENABLED */
+
+#ifdef HAL_PSSI_MODULE_ENABLED
+  #include "stm32l4xx_hal_pssi.h"
+#endif /* HAL_PSSI_MODULE_ENABLED */
 
 #ifdef HAL_PWR_MODULE_ENABLED
   #include "stm32l4xx_hal_pwr.h"
@@ -360,6 +412,10 @@
   #include "stm32l4xx_hal_sd.h"
 #endif /* HAL_SD_MODULE_ENABLED */
 
+#ifdef HAL_SMARTCARD_MODULE_ENABLED
+  #include "stm32l4xx_hal_smartcard.h"
+#endif /* HAL_SMARTCARD_MODULE_ENABLED */
+
 #ifdef HAL_SMBUS_MODULE_ENABLED
   #include "stm32l4xx_hal_smbus.h"
 #endif /* HAL_SMBUS_MODULE_ENABLED */
@@ -367,6 +423,10 @@
 #ifdef HAL_SPI_MODULE_ENABLED
   #include "stm32l4xx_hal_spi.h"
 #endif /* HAL_SPI_MODULE_ENABLED */
+
+#ifdef HAL_SRAM_MODULE_ENABLED
+  #include "stm32l4xx_hal_sram.h"
+#endif /* HAL_SRAM_MODULE_ENABLED */
 
 #ifdef HAL_SWPMI_MODULE_ENABLED
   #include "stm32l4xx_hal_swpmi.h"
@@ -388,25 +448,9 @@
   #include "stm32l4xx_hal_usart.h"
 #endif /* HAL_USART_MODULE_ENABLED */
 
-#ifdef HAL_IRDA_MODULE_ENABLED
-  #include "stm32l4xx_hal_irda.h"
-#endif /* HAL_IRDA_MODULE_ENABLED */
-
-#ifdef HAL_SMARTCARD_MODULE_ENABLED
-  #include "stm32l4xx_hal_smartcard.h"
-#endif /* HAL_SMARTCARD_MODULE_ENABLED */
-
 #ifdef HAL_WWDG_MODULE_ENABLED
   #include "stm32l4xx_hal_wwdg.h"
 #endif /* HAL_WWDG_MODULE_ENABLED */
-
-#ifdef HAL_PCD_MODULE_ENABLED
-  #include "stm32l4xx_hal_pcd.h"
-#endif /* HAL_PCD_MODULE_ENABLED */
-
-#ifdef HAL_HCD_MODULE_ENABLED
-  #include "stm32l4xx_hal_hcd.h"
-#endif /* HAL_HCD_MODULE_ENABLED */
 
 /* Exported macro ------------------------------------------------------------*/
 #ifdef  USE_FULL_ASSERT
