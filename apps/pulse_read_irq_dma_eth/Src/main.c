@@ -100,6 +100,7 @@ __IO uint32_t  pulses_detected = 0;
 const uint32_t timestamps_size = 4*1024;
 uint32_t* timestamps;
 
+// __IO uint32_t pulses_to_sent = 0;
 uint32_t pulses_to_sent = 0;
 uint32_t pulses_sent = 0;
 
@@ -244,7 +245,7 @@ int main(void)
   pulses_to_detect = 262144; // 2^18
   // pulses_to_detect = 1048576; // 2^20
   // pulses_to_detect = 4194304; // 2^22
-  // pulses_to_detect = 16777216; // 2^24
+  pulses_to_detect = 16777216; // 2^24
   // pulses_to_detect = 2147483648; // 2^31
 
   struct Statistics stats;
@@ -335,15 +336,6 @@ int main(void)
       UART_Printf("%s", aTxBuffer);
       // UART_Printf_No_Block("%s", aTxBuffer);
     }
-
-    if(send_udp_packets) {
-      udp_packet = (uint8_t*) current_timestamps;
-      udp_packet_size = pulses_step_size*sizeof(uint32_t);
-      nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, dest_port);
-    }
-
-    // Mark sent timestamps
-    // memset(current_timestamps, 0xFF, pulses_step_size*sizeof(uint32_t));
 
     // Don't wait for transmission unless we lost some data
   }
@@ -719,7 +711,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     /* Increment detected pulses */
     pulses_detected++;
 
-    if(pulses_detected > pulses_sent + pulses_step_size && !transfering_timestamps) {
+    // If there is enough pulse timestamps to send and
+    // the transfer is not already occuring, we can trigger
+    // the software interrupt that will send the timestamps
+    if(pulses_detected >= pulses_sent + pulses_step_size && !transfering_timestamps) {
       // Tell that transfer is occuring
       transfering_timestamps = 1;
 
@@ -739,6 +734,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
     // preprare UDP packet pointers and size
     uint8_t* udp_packet = (uint8_t*) current_timestamps;
+    // uint32_t udp_packet_size = pulses_to_sent*sizeof(uint32_t);
     uint32_t udp_packet_size = pulses_step_size*sizeof(uint32_t);
 
     // Send it, following method will block until packet is sent

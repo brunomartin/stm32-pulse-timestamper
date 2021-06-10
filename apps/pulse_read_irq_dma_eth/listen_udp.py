@@ -45,6 +45,8 @@ durations = []
 wait_duration_start = time.time()
 first_fragment_time = time.time()
 
+pulses = 0
+
 while True:
 
   start = time.time()
@@ -67,12 +69,15 @@ while True:
   wait_duration_start = transfer_end_time
   transfer_duration = transfer_end_time - first_fragment_time
 
-  # print it for information
-  print("{}: fragments: {}, waited: {:.2f}ms, transfer:{:.2f}ms".format(
-    count, fragment_count, wait_duration*1000, transfer_duration*1000))
-
   # convert data to uint32 array
   new_timestamps = list(struct.unpack('I' * int(len(data) / 4), data))
+
+  pulses += len(new_timestamps)
+
+  # print it for information
+  print("{}: fragments: {}, waited: {:6.2f}ms, transfer: {:3.0f}us, pulses: {}".format(
+    count, fragment_count, wait_duration*1e3, transfer_duration*1e6, pulses))
+
 
   if concatenat_timestamps:
     # concatenate with last timestamps to ensure continuity
@@ -127,7 +132,8 @@ while True:
     rate = 1/average
 
   # print statistics
-  print("  average: {:.2f}us, dev: {:.2f}us, min: {:.2f}us, max: {:.2f}us, rate: {:.2f}kHz".format(
+  print("  average: {:.2f}us, dev: {:5.2f}us, min: {:5.2f}us,"
+    " max: {:5.2f}us, rate: {:.2f}kHz".format(
     average, std_dev, min, max, rate*1000))
 
   if std_dev > 10:
