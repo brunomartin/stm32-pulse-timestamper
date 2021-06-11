@@ -105,9 +105,17 @@ uint32_t pulses_sent = 0;
 uint8_t udp_socket = UDP_SOCKET;
 int dest_port = 8042;
 
+// pulses_critical_section intends to protect read and write
+// accesses to timestamps current index
 __IO uint8_t pulses_critical_section = 0;
+
+// transfering_timestamps tells that transfer is occuring
+// avoiding sending same timestamps twice 
 __IO uint8_t transfering_timestamps = 0;
 
+// address is the destination IP address where to
+// send timestamps when { 255, 255, 255, 255 }, it waits
+// for client connection
 // uint8_t address[4] = { 255, 255, 255, 255 };
 uint8_t address[4] = { 192, 168, 1, 15 };
 // uint8_t address[4] = { 192, 168, 1, 40 };
