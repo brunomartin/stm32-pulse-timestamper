@@ -49,8 +49,6 @@ pulses = 0
 
 while True:
 
-  start = time.time()
-
   for fragment in range(0, fragment_count):
 
     data_start = fragment * fragment_size
@@ -78,9 +76,13 @@ while True:
   print("{}: fragments: {}, waited: {:6.2f}ms, transfer: {:3.0f}us, pulses: {}".format(
     count, fragment_count, wait_duration*1e3, transfer_duration*1e6, pulses))
 
+  # if we waited too long, throw away last timestamps
+  if wait_duration < 1e6:
+    last_timestamps = []
 
+  # concatenate with last timestamps to ensure continuity
+  # if we did not wait too long
   if concatenat_timestamps:
-    # concatenate with last timestamps to ensure continuity
     timestamps = last_timestamps + new_timestamps
     last_timestamps = new_timestamps
   else:

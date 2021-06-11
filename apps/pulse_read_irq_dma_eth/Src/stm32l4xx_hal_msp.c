@@ -63,7 +63,6 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart)
   USARTx_TX_GPIO_CLK_ENABLE();
   USARTx_RX_GPIO_CLK_ENABLE();
 
-
   /* Enable USARTx clock */
   USARTx_CLK_ENABLE();
 

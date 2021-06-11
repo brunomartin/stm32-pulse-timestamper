@@ -250,7 +250,7 @@ int main(void)
   // pulses_to_detect = 0;
   pulses_to_detect = 16*timestamps_size;
   pulses_to_detect = 262144; // 2^18
-  pulses_to_detect = 1048576; // 2^20
+  // pulses_to_detect = 1048576; // 2^20
   // pulses_to_detect = 4194304; // 2^22
   // pulses_to_detect = 16777216; // 2^24
   // pulses_to_detect = 2147483648; // 2^31
@@ -490,17 +490,9 @@ static uint32_t GetTimerTimeMs() {
 static void Error_Handler(void)
 {
   /* Turn LED2 to off for error */
-  BSP_LED_Off(LED2); 
+  UART_Printf("Error_Handler()\r\n");
   while(1)
   {
-      BSP_LED_Toggle(LED2);
-      HAL_Delay(100);
-      BSP_LED_Toggle(LED2);
-      HAL_Delay(100);
-      BSP_LED_Toggle(LED2);
-      HAL_Delay(100);
-      BSP_LED_Toggle(LED2);
-      HAL_Delay(700);
   }
 }
 
@@ -522,7 +514,7 @@ static void ComputeStats(const uint32_t* timestamps, uint32_t size, struct Stati
   double elapsed;
   for(int i=1;i<size;i++) {
     elapsed = timestamps[i] - timestamps[i-1];
-    stats->std_dev += (elapsed-stats->mean)*(elapsed-stats->mean);
+    stats->std_dev += pow(elapsed-stats->mean, 2);
   }
   stats->std_dev = sqrt(stats->std_dev/(size-1));
 
