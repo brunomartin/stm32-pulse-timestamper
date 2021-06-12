@@ -26,7 +26,9 @@ fragment_count = 4
 counter_period = 4000000000
 
 # timestamp precision in us
-counter_precision = 0.1
+counter_precision = 1.0 # 1MHz
+counter_precision = 0.1 # 10MHz
+counter_precision = 0.0125 # 80MHz
 
 # UDP packet size
 packet_size = fragment_count*fragment_size
@@ -90,11 +92,6 @@ while True:
     last_timestamps = new_timestamps
   else:
     timestamps = new_timestamps
-
-  # Check if any bad value
-  for i in range(len(timestamps)):
-    if timestamps[i] >= counter_period:
-      print("!!!! timestamps[{}]: 0xFFFFFFFF".format(i))
 
   # unwrap timestamps according to counter period
   for i in range(1, len(timestamps)):

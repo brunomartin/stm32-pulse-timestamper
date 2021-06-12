@@ -44,18 +44,25 @@ enum {
 
 /* Timer declaration */
 TIM_HandleTypeDef htim = {0};
-// uint32_t uwPrescalerFreq = 80000000; // timer precision is 12.5ns
-// uint32_t uwPrescalerFreq =  1000000; // timer precision is 12.5 * 80 = 1000ns
-uint32_t uwPrescalerFreq = 10000000; // timer precision is 12.5 * 8 = 100ns
 
-uint32_t uwPeriod = 4000000000 - 1; // timer will wrapped before 4M
+// 80MHz: timer precision is 12.5ns, 4G*12.5ns: 50s
+uint32_t uwPrescalerFreq = 80000000; 
+
+// 1MHz: timer precision is 12.5 * 80 = 1000ns, 4G*1000ns: 4000s
+// uint32_t uwPrescalerFreq =  1000000;
+
+// 10MHz: timer precision is 12.5 * 8 = 100ns, 4G*100ns: 400s
+// uint32_t uwPrescalerFreq = 10000000;
+
+uint32_t uwPeriod = 4000000000 - 1; // timer will wrapped before 4G
 
 /* UART handler declaration */
 UART_HandleTypeDef UartHandle;
 __IO ITStatus UartReady = RESET;
 
 /* Buffer used for transmission */
-uint8_t aTxBuffer[] = "****READY TO RECEIVE PULSES****\n\r"
+uint8_t aTxBuffer[] = 
+"****READY TO RECEIVE PULSES****\n\r"
 "****READY TO RECEIVE PULSES****\n\r"
 "****READY TO RECEIVE PULSES****\n\r"
 "****READY TO RECEIVE PULSES****\n\r"
@@ -312,7 +319,6 @@ int main(void)
 
     uint32_t pulses_to_sent = 0;
 
-#if 1
     // If there is still pulses to send after a duration (50ms) since
     // last pulse detected, force sending theme it by triggering
     // software interrupt
@@ -323,31 +329,28 @@ int main(void)
     force_send_packets &= !buffering_timestamps;
     if(force_send_packets) {
       pulses_to_sent = current_pulses_detected - current_pulses_sent;
-#if 1
       UART_Printf("Force sending %d pulses\r\n", pulses_to_sent);
       // Tell that transfer is occuring unless it may reentre here
       buffering_timestamps = 1;
 
       exti.Line = EXTI_LINE_9;
       HAL_EXTI_GenerateSWI(&exti);
-#endif
     }
-#endif
 
     duration = (current_time_ms - last_print_time_ms);
     if(duration > 2000) {
       UART_Printf(
         "INFO:\r\n"
-        "  current_pulses_detected: %d\r\n"
-        "  pulses_sent: %d\r\n"
-        "  packets_sent: %d\r\n"
         "  current_time_ms: %d\r\n"
         "  last_detected_pulse_time_ms: %d\r\n"
         "  last_packet_time_ms: %d\r\n"
+        "  current_pulses_detected: %d\r\n"
+        "  current_pulses_sent: %d\r\n"
+        "  current_packets_sent: %d\r\n"
         "  pulses_to_sent: %d\r\n"
         ,
-        current_pulses_detected, current_pulses_sent, current_packets_sent,
         current_time_ms, last_detected_pulse_time_ms, last_packet_time_ms,
+        current_pulses_detected, current_pulses_sent, current_packets_sent,
         pulses_to_sent);
 
       last_print_time_ms = GetTimerTimeMs();
