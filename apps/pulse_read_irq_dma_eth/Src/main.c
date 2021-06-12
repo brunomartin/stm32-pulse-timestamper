@@ -105,10 +105,6 @@ uint32_t pulses_sent = 0;
 uint8_t udp_socket = UDP_SOCKET;
 int dest_port = 8042;
 
-// pulses_critical_section intends to protect read and write
-// accesses to timestamps current index
-__IO uint8_t pulses_critical_section = 0;
-
 // transfering_timestamps tells that transfer is occuring
 // avoiding sending same timestamps twice 
 __IO uint8_t transfering_timestamps = 0;
@@ -123,14 +119,16 @@ uint8_t address[4] = { 192, 168, 1, 15 };
 EXTI_HandleTypeDef exti;
 
 // Set number of pulses to qait before sending packet
-// const int pulses_step_size = 2*1024; // too much, bad sent packets, std dev too high
-const int pulses_step_size = 1*1024; // OK
-// const int pulses_step_size = 512; // too low, bad sent packets, std dev too high
-// const int pulses_step_size = timestamps_size/4;
-// pulses_step_size = timestamps_size/8;
-// pulses_step_size = timestamps_size/16;
-// pulses_step_size = 1024/4;
-// pulses_step_size = 1024/16;
+// const int timestamps_buffer_size = 2*1024; // too much, bad sent packets, std dev too high
+const int timestamps_buffer_size = 1*1024; // OK
+// const int timestamps_buffer_size = 512; // too low, bad sent packets, std dev too high
+// const int timestamps_buffer_size = timestamps_size/4;
+// timestamps_buffer_size = timestamps_size/8;
+// timestamps_buffer_size = timestamps_size/16;
+// timestamps_buffer_size = 1024/4;
+// timestamps_buffer_size = 1024/16;
+
+uint32_t* timestamps_buffer;
 
 struct Statistics {
   uint32_t count;
@@ -211,6 +209,7 @@ int main(void)
   SPI_Config();
 
   timestamps = (uint32_t*) malloc(timestamps_size*sizeof(uint32_t));
+  timestamps_buffer = (uint32_t*) malloc(timestamps_buffer_size*sizeof(uint32_t));
 
   for(size_t i=0;i<timestamps_size;i++) {
     timestamps[i] = (uint32_t) i;
@@ -218,6 +217,9 @@ int main(void)
 
   // Init timestamp buffer with magic number
   memset(timestamps, 0xFF, timestamps_size*sizeof(uint32_t));
+
+  // Mark timestamps_buffer
+  memset(timestamps_buffer, 0xFF, timestamps_buffer_size*sizeof(uint32_t));
   
   /* Configure w5500 */
   W5500_Config();
@@ -257,7 +259,7 @@ int main(void)
 
   struct Statistics stats;
   int pulses_last_step = 0;
-  int pulses_next_step = pulses_step_size;
+  int pulses_next_step = timestamps_buffer_size;
   uint32_t* current_timestamps = NULL;
 
   uint32_t current_pulses_detected = 0;
@@ -275,13 +277,13 @@ int main(void)
 
   UART_Printf("Filling RAM and Tx buffer...\n\r");
   // Fill Tx buffer
-  for(int i=0;i<timestamps_size;i+=pulses_step_size) {
+  for(int i=0;i<timestamps_size;i+=timestamps_buffer_size) {
 
     current_timestamps = timestamps;
     current_timestamps += i;
     
     udp_packet = (uint8_t*) current_timestamps;
-    udp_packet_size = pulses_step_size*sizeof(uint32_t);
+    udp_packet_size = timestamps_buffer_size*sizeof(uint32_t);
     nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, 65535);
   }
 
@@ -315,11 +317,11 @@ int main(void)
     current_timestamps += pulses_last_step % timestamps_size;
 
     pulses_last_step = pulses_next_step;
-    pulses_next_step += pulses_step_size;
+    pulses_next_step += timestamps_buffer_size;
 
     if(compute_stats) {
       // Compute statistics
-      ComputeStats(current_timestamps, pulses_step_size, &stats);
+      ComputeStats(current_timestamps, timestamps_buffer_size, &stats);
 
       // Initialize message to send
       memset(aTxBuffer, 0, TXBUFFERSIZE);
@@ -703,14 +705,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {  
   if (GPIO_Pin == EXTIx_PIN) {
 
-    while(pulses_critical_section == 1) {}
-
     uint32_t index = pulses_detected%timestamps_size;
 
     // And store counter value
     timestamps[index] = __HAL_TIM_GET_COUNTER(&htim);
-
-    pulses_critical_section = 0;
 
     /* Increment detected pulses */
     pulses_detected++;
@@ -719,7 +717,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     // the transfer is not already occuring, we can trigger
     // the software interrupt that will send the timestamps
     if(!transfering_timestamps) {
-      if(pulses_detected >= pulses_sent + pulses_step_size) {
+      if(pulses_detected >= pulses_sent + timestamps_buffer_size) {
         // Tell that transfer is occuring
         transfering_timestamps = 1;
 
@@ -737,19 +735,15 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     // Else, it has been triggered by main ot timer and
     // The packet won't be complete
 
-    while(pulses_critical_section == 1) {}
-
     uint32_t pulses_to_sent = pulses_detected - pulses_sent;
-    if(pulses_to_sent > pulses_step_size) {
-      pulses_to_sent = pulses_step_size;
-    } else if(pulses_to_sent < pulses_step_size) {
-      UART_Printf("pulses_to_sent (%d) < pulses_step_size\r\n", pulses_to_sent);
+    if(pulses_to_sent > timestamps_buffer_size) {
+      pulses_to_sent = timestamps_buffer_size;
+    } else if(pulses_to_sent < timestamps_buffer_size) {
+      UART_Printf("pulses_to_sent (%d) < timestamps_buffer_size\r\n", pulses_to_sent);
 
       // Tell that transfer is occuring
       transfering_timestamps = 1;
     }
-
-    pulses_critical_section = 0;
 
     // Prepare and send udp packets
 
@@ -762,8 +756,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
       UART_Printf("current_index + pulses_to_sent > timestamps_size\r\n");
     }
 
+    // Copy current content to apropriate buffer
+    memcpy(timestamps_buffer, current_timestamps, pulses_to_sent*sizeof(uint32_t));
+
     // prepare UDP packet pointers and size
-    uint8_t* udp_packet = (uint8_t*) current_timestamps;
+    uint8_t* udp_packet = (uint8_t*) timestamps_buffer;
     uint32_t udp_packet_size = pulses_to_sent*sizeof(uint32_t);
 
     // Send it, following method will block until packet is sent
@@ -771,8 +768,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     // this one, so the method won't be block be this interrupt
     int32_t nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, dest_port);
 
-    // Mark sent timestamps
-    memset(current_timestamps, 0xFF, pulses_step_size*sizeof(uint32_t));
+    // Mark timestamps_buffer
+    memset(timestamps_buffer, 0xFF, timestamps_buffer_size*sizeof(uint32_t));
 
     // Update number of pulses sent
     pulses_sent += pulses_to_sent;
