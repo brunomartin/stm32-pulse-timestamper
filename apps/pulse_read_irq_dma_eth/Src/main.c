@@ -765,8 +765,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     // missing ones will be sent next time
     if(pulses_to_sent > timestamps_buffer_size) {
       pulses_to_sent = timestamps_buffer_size;
-    } else if(pulses_to_sent < timestamps_buffer_size) {
-      UART_Printf("pulses_to_sent (%d) < timestamps_buffer_size\r\n", pulses_to_sent);
     }
 
     // Prepare and send udp packets
@@ -808,7 +806,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
     // prepare UDP packet pointers and size
     uint8_t* udp_packet = (uint8_t*) timestamps_buffer;
-    uint32_t udp_packet_size = pulses_to_sent*sizeof(uint32_t);
+    uint32_t udp_packet_size = timestamps_buffer_size*sizeof(uint32_t);
 
     // Send it, following method will block until packet is sent
     // Interrupt accuring in the method has higher priority than

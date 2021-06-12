@@ -70,6 +70,9 @@ while True:
   # convert data to uint32 array
   new_timestamps = list(struct.unpack('I' * int(len(data) / 4), data))
 
+  # remove trailing magic value if any
+  new_timestamps = [x for x in new_timestamps if x < counter_period]
+
   pulses += len(new_timestamps)
 
   # print it for information
