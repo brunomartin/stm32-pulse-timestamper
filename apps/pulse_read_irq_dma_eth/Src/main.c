@@ -101,7 +101,7 @@ const uint32_t timestamps_size = 4*1024;
 // const uint32_t timestamps_size = 9*512;
 uint32_t* timestamps;
 
-uint32_t pulses_sent = 0;
+__IO uint32_t pulses_sent = 0;
 
 uint8_t udp_socket = UDP_SOCKET;
 int dest_port = 8042;
@@ -285,6 +285,14 @@ int main(void)
     udp_packet_size = timestamps_buffer_size*sizeof(uint32_t);
     nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, 65535);
   }
+
+  // udp_packet = (uint8_t*) timestamps;
+  // udp_packet_size = timestamps_size*sizeof(uint32_t);
+  // nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, 65535);
+
+  // udp_packet = (uint8_t*) timestamps_buffer;
+  // udp_packet_size = timestamps_buffer_size*sizeof(uint32_t);
+  // nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, 65535);
 
   UART_Printf("****READY TO RECEIVE PULSES****\n\r");
 
@@ -697,6 +705,14 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     buffering_timestamps = 1;
 
     uint32_t pulses_to_sent = pulses_detected - pulses_sent;
+
+    // If there is no pulse to send then return
+    if(pulses_to_sent == 0) {
+      return;
+    }
+
+    // If number of pulse to send exceeds buffer, take only the first
+    // missing ones will be sent next time
     if(pulses_to_sent > timestamps_buffer_size) {
       pulses_to_sent = timestamps_buffer_size;
     } else if(pulses_to_sent < timestamps_buffer_size) {
