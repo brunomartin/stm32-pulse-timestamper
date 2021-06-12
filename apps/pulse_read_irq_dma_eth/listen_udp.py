@@ -110,6 +110,9 @@ while True:
   for i in range(len(timestamps)):
     timestamps[i] = float(timestamps[i])
 
+  if len(timestamps) == 1:
+    continue
+
   # compute durations from timestamps
   durations = [(timestamps[i] - timestamps[i-1]) for i in range(1, len(timestamps)-1)]
 
