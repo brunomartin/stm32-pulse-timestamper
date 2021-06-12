@@ -139,4 +139,8 @@ while True:
     average, std_dev, min, max, rate*1000))
 
   if std_dev > 10:
-    raise Exception("std_dev > 10")
+    print(
+      "%%%%%%%%%%%%%%%%\n"
+      "% std_dev > 10 %\n"
+      "%%%%%%%%%%%%%%%%"
+      )

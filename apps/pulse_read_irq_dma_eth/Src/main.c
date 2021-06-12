@@ -112,6 +112,8 @@ __IO uint8_t buffering_timestamps = 0;
 
 __IO uint32_t packets_sent = 0;
 
+__IO uint32_t last_packet_time_ms = -1;
+
 // address is the destination IP address where to
 // send timestamps when { 255, 255, 255, 255 }, it waits
 // for client connection
@@ -171,6 +173,7 @@ static void ComputeStats(const uint32_t* timestamps,
 
 static void HAL_Delay_us(uint32_t ticks);
 
+static uint32_t GetTimerTimeUsFromCounter();
 static uint32_t GetTimerTimeUs();
 static uint32_t GetTimerTimeMs();
 
@@ -270,9 +273,9 @@ int main(void)
   uint32_t last_print_time_ms = current_time_ms;
   uint32_t duration;
 
-  uint8_t* udp_packet;
-  uint32_t udp_packet_size;
-  int32_t nbytes;
+  int8_t force_send_packets = 0;
+
+  uint32_t last_detected_pulse_time_ms = -1;
 
   UART_Printf("Filling RAM and Tx buffer...\n\r");
   // Fill Tx buffer
@@ -281,40 +284,79 @@ int main(void)
     current_timestamps = timestamps;
     current_timestamps += i;
     
-    udp_packet = (uint8_t*) timestamps_buffer;
-    udp_packet_size = timestamps_buffer_size*sizeof(uint32_t);
-    nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, 65535);
+    uint8_t* udp_packet = (uint8_t*) timestamps_buffer;
+    uint32_t udp_packet_size = timestamps_buffer_size*sizeof(uint32_t);
+    int32_t nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, 65535);
   }
-
-  // udp_packet = (uint8_t*) timestamps;
-  // udp_packet_size = timestamps_size*sizeof(uint32_t);
-  // nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, 65535);
-
-  // udp_packet = (uint8_t*) timestamps_buffer;
-  // udp_packet_size = timestamps_buffer_size*sizeof(uint32_t);
-  // nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, 65535);
 
   UART_Printf("****READY TO RECEIVE PULSES****\n\r");
 
   /* Wait all pulses have been detected */
   while (1) {
 
+    // Store volatile variables before testing them
+    uint32_t current_pulses_detected = pulses_detected;
+    uint32_t current_packets_sent = packets_sent;
+    uint32_t current_pulses_sent = pulses_sent;
+
     current_time_ms = GetTimerTimeMs();
     if(current_time_ms < last_print_time_ms) {
       UART_Printf("Timer wrapped\r\n");
     }
 
+    if(current_pulses_detected > 0) {
+      uint32_t index = current_pulses_detected%timestamps_size;
+      last_detected_pulse_time_ms = GetTimerTimeUsFromCounter(
+        timestamps[index]) / 1000;
+    }
+
+    uint32_t pulses_to_sent = 0;
+
+#if 1
+    // If there is still pulses to send after a duration since
+    // last pulse detected, force sending theme it by triggering
+    // software interrupt
+    force_send_packets = 1;
+    force_send_packets &= current_pulses_detected > current_pulses_sent;
+    force_send_packets &= last_detected_pulse_time_ms != -1;
+    force_send_packets &= current_time_ms > last_detected_pulse_time_ms;
+    force_send_packets &= current_time_ms - last_detected_pulse_time_ms > 1e3;
+    force_send_packets &= !buffering_timestamps;
+    if(force_send_packets) {
+      pulses_to_sent = current_pulses_detected - current_pulses_sent;
+#if 1
+      UART_Printf("Force sending %d pulses\r\n", pulses_to_sent);
+      // Tell that transfer is occuring unless it may reentre here
+      buffering_timestamps = 1;
+
+      exti.Line = EXTI_LINE_9;
+      HAL_EXTI_GenerateSWI(&exti);
+#endif
+    }
+#endif
+
     duration = (current_time_ms - last_print_time_ms);
     if(duration > 2000) {
-      UART_Printf("Print: current_time_ms: %d\r\n", current_time_ms);
-      UART_Printf("Print: pulses_detected: %d\r\n", pulses_detected);
-      UART_Printf("Print: packets_sent: %d\r\n", packets_sent);
+      UART_Printf(
+        "INFO:\r\n"
+        "  current_pulses_detected: %d\r\n"
+        "  pulses_sent: %d\r\n"
+        "  packets_sent: %d\r\n"
+        "  current_time_ms: %d\r\n"
+        "  last_detected_pulse_time_ms: %d\r\n"
+        "  last_packet_time_ms: %d\r\n"
+        "  pulses_to_sent: %d\r\n"
+        ,
+        current_pulses_detected, current_pulses_sent, current_packets_sent,
+        current_time_ms, last_detected_pulse_time_ms, last_packet_time_ms,
+        pulses_to_sent);
+
       last_print_time_ms = GetTimerTimeMs();
     }
 
     // Delay of 1ms to let the MCU free, not too long to
     // avoid loosing packet to send
-    HAL_Delay(1);
+    HAL_Delay(10);
   }
 
   UART_Printf("packets sent: %d\r\n", send_id);
@@ -432,6 +474,14 @@ void TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   // Do something
 }
 
+
+/**
+  * @brief  Get Timer Time in us according to TIMx counter
+  * @retval Elapsed us since la TIMx reset
+  */
+static uint32_t GetTimerTimeUsFromCounter(uint32_t count) {
+  return count / (uwPrescalerFreq / 1e6);
+}
 
 /**
   * @brief  Get Timer Time in us according to TIMx counter
@@ -765,6 +815,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     // this one, so the method won't be block be this interrupt
     int32_t nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, dest_port);
 
+    last_packet_time_ms = GetTimerTimeMs();
     packets_sent++;
 
     // Mark timestamps_buffer
