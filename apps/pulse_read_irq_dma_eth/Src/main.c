@@ -97,8 +97,8 @@ __IO uint32_t  pulses_detected = 0;
 // A second detection line is scheduled so 8kB of Tx buffer
 // 16kB for the line is ok, this 4*1024 uint32
 // 8kB for the line is ok, this 2*1024 uint32
-// const uint32_t timestamps_size = 4*1024;
-const uint32_t timestamps_size = 9*512;
+const uint32_t timestamps_size = 4*1024;
+// const uint32_t timestamps_size = 9*512;
 uint32_t* timestamps;
 
 uint32_t pulses_sent = 0;
@@ -109,6 +109,8 @@ int dest_port = 8042;
 // buffering_timestamps tells that trabufferingnsfer is occuring
 // avoiding sending same timestamps twice 
 __IO uint8_t buffering_timestamps = 0;
+
+__IO uint32_t packets_sent = 0;
 
 // address is the destination IP address where to
 // send timestamps when { 255, 255, 255, 255 }, it waits
@@ -231,10 +233,6 @@ int main(void)
   /* Start timer now */
   HAL_TIM_Base_Start(&htim);
 
-  uint8_t send_udp_packets = 0;
-  uint8_t compute_stats = 0;
-  uint8_t send_stats = 0;
-
   int server_port = 8041;
   // int dest_port = 8042;
 
@@ -291,68 +289,24 @@ int main(void)
   UART_Printf("****READY TO RECEIVE PULSES****\n\r");
 
   /* Wait all pulses have been detected */
-  while (pulses_detected < pulses_to_detect) {
+  while (1) {
 
-    // Wait for a part of pulse to be detected and compute stats
-    while (current_pulses_detected = pulses_detected < pulses_next_step) {
-
-      current_time_ms = GetTimerTimeMs();
-      duration = (current_time_ms - last_print_time_ms);
-      if(current_time_ms < last_print_time_ms) {
-        UART_Printf("Timer wrapped\r\n");
-      }
-
-      if(duration > 2000) {
-        UART_Printf("Print: current_time_ms: %d\r\n", current_time_ms);
-        UART_Printf("Print: pulses_last_step: %d\r\n", pulses_last_step);
-        UART_Printf("Print: pulses_detected: %d\r\n", pulses_detected);
-        last_print_time_ms = GetTimerTimeMs();
-      }
-
-      // Delay of 1ms to let the MCU free, not too long to
-      // avoid loosing packet to send
-      HAL_Delay(1);
+    current_time_ms = GetTimerTimeMs();
+    if(current_time_ms < last_print_time_ms) {
+      UART_Printf("Timer wrapped\r\n");
     }
 
-    current_timestamps = timestamps;
-    current_timestamps += pulses_last_step % timestamps_size;
-
-    pulses_last_step = pulses_next_step;
-    pulses_next_step += timestamps_buffer_size;
-
-    if(compute_stats) {
-      // Compute statistics
-      ComputeStats(current_timestamps, timestamps_buffer_size, &stats);
-
-      // Initialize message to send
-      memset(aTxBuffer, 0, TXBUFFERSIZE);
-      
-      // Transmit results on serial link
-      sprintf(aTxBuffer, "%d: total: %0.2fs, count: %lu mean: %0.2fus, std: %0.2fus, min: %luus, max: %luus, rate: %0.2fkHz\n\r", send_id, stats.total/1e6, stats.count, stats.mean, stats.std_dev, stats.min, stats.max, 1/stats.mean*1e3);
+    duration = (current_time_ms - last_print_time_ms);
+    if(duration > 2000) {
+      UART_Printf("Print: current_time_ms: %d\r\n", current_time_ms);
+      UART_Printf("Print: pulses_detected: %d\r\n", pulses_detected);
+      UART_Printf("Print: packets_sent: %d\r\n", packets_sent);
+      last_print_time_ms = GetTimerTimeMs();
     }
 
-    send_id++;
-
-    if(send_stats) {
-
-      if(!compute_stats) {
-        // Initialize message to send
-        memset(aTxBuffer, 0, TXBUFFERSIZE);
-        
-        // Transmit results on serial link
-        sprintf(aTxBuffer, "%d: stats not computed\n\r", send_id);
-      }
-
-      UART_Printf("%s", aTxBuffer);
-      // UART_Printf_No_Block("%s", aTxBuffer);
-    }
-
-    // Don't wait for transmission unless we lost some data
-  }
-
-  if(send_udp_packets) {
-    // Program won't go further if we stop udp server
-    // udp_server_stop(udp_socket);
+    // Delay of 1ms to let the MCU free, not too long to
+    // avoid loosing packet to send
+    HAL_Delay(1);
   }
 
   UART_Printf("packets sent: %d\r\n", send_id);
@@ -365,6 +319,9 @@ int main(void)
   while (1)
   {
   }
+
+  // Program won't go further if we stop udp server
+  // udp_server_stop(udp_socket);
 }
 
 /**
@@ -792,6 +749,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     // this one, so the method won't be block be this interrupt
     int32_t nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, dest_port);
 
+    packets_sent++;
+
     // Mark timestamps_buffer
     memset(timestamps_buffer, 0xFF, timestamps_buffer_size*sizeof(uint32_t));
   }
@@ -968,8 +927,6 @@ void W5500_Config() {
     if(wizchip_init(tx_buff_sizes, rx_buff_sizes) != 0) {
       UART_Printf("wizchip_init() ERROR !\r\n");
     }
-
-    // setSn_TXBUF_SIZE(UDP_SOCKET, 16);
 
     UART_Printf("Calling DHCP_init()...\r\n");
     wiz_NetInfo net_info = {
