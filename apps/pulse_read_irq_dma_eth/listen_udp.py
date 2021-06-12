@@ -98,11 +98,6 @@ while True:
     while timestamps[i] - timestamps[i-1] < -counter_period/2:
       timestamps[i] += counter_period
 
-  # UDP packet may not arrived in order
-  # Nervertheless, they came from the same line
-  # so we can sort them
-  # timestamps.sort()
-
   # convert timestamps to float
   for i in range(len(timestamps)):
     timestamps[i] = float(timestamps[i])
