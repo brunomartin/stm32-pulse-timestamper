@@ -305,7 +305,7 @@ int main(void)
     }
 
     if(current_pulses_detected > 0) {
-      uint32_t index = current_pulses_detected%timestamps_size;
+      uint32_t index = (current_pulses_detected-1)%timestamps_size;
       last_detected_pulse_time_ms = GetTimerTimeUsFromCounter(
         timestamps[index]) / 1000;
     }
@@ -313,14 +313,13 @@ int main(void)
     uint32_t pulses_to_sent = 0;
 
 #if 1
-    // If there is still pulses to send after a duration since
+    // If there is still pulses to send after a duration (50ms) since
     // last pulse detected, force sending theme it by triggering
     // software interrupt
     force_send_packets = 1;
     force_send_packets &= current_pulses_detected > current_pulses_sent;
     force_send_packets &= last_detected_pulse_time_ms != -1;
-    force_send_packets &= current_time_ms > last_detected_pulse_time_ms;
-    force_send_packets &= current_time_ms - last_detected_pulse_time_ms > 1e3;
+    force_send_packets &= current_time_ms > last_detected_pulse_time_ms + 50;
     force_send_packets &= !buffering_timestamps;
     if(force_send_packets) {
       pulses_to_sent = current_pulses_detected - current_pulses_sent;
@@ -441,7 +440,6 @@ static void Timer_Config(void)
     htim.Init.CounterMode       = TIM_COUNTERMODE_UP;
     htim.Init.Period            = 0xFFFFFFFF;
     htim.Init.Period            = uwPeriod;
-    // htim.Init.Period            = 40000000 - 1;
     htim.Init.ClockDivision     = TIM_CLOCKDIVISION_DIV1;
     htim.Init.RepetitionCounter = 0x0;
 
