@@ -283,7 +283,7 @@ int main(void)
     current_timestamps = timestamps;
     current_timestamps += i;
     
-    udp_packet = (uint8_t*) current_timestamps;
+    udp_packet = (uint8_t*) timestamps_buffer;
     udp_packet_size = timestamps_buffer_size*sizeof(uint32_t);
     nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, 65535);
   }
