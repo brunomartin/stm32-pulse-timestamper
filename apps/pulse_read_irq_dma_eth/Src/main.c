@@ -97,7 +97,8 @@ __IO uint32_t  pulses_detected = 0;
 // A second detection line is scheduled so 8kB of Tx buffer
 // 16kB for the line is ok, this 4*1024 uint32
 // 8kB for the line is ok, this 2*1024 uint32
-const uint32_t timestamps_size = 4*1024;
+// const uint32_t timestamps_size = 4*1024;
+const uint32_t timestamps_size = 9*512;
 uint32_t* timestamps;
 
 uint32_t pulses_sent = 0;
@@ -105,9 +106,9 @@ uint32_t pulses_sent = 0;
 uint8_t udp_socket = UDP_SOCKET;
 int dest_port = 8042;
 
-// transfering_timestamps tells that transfer is occuring
+// buffering_timestamps tells that trabufferingnsfer is occuring
 // avoiding sending same timestamps twice 
-__IO uint8_t transfering_timestamps = 0;
+__IO uint8_t buffering_timestamps = 0;
 
 // address is the destination IP address where to
 // send timestamps when { 255, 255, 255, 255 }, it waits
@@ -716,14 +717,14 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     // If there is enough pulse timestamps to send and
     // the transfer is not already occuring, we can trigger
     // the software interrupt that will send the timestamps
-    if(!transfering_timestamps) {
-      if(pulses_detected >= pulses_sent + timestamps_buffer_size) {
-        // Tell that transfer is occuring
-        transfering_timestamps = 1;
+    if((pulses_detected >= pulses_sent + timestamps_buffer_size) &&
+      !buffering_timestamps) {
 
-        exti.Line = EXTI_LINE_9;
-        HAL_EXTI_GenerateSWI(&exti);
-      }
+      // Tell that transfer is occuring unless it may reentre here
+      buffering_timestamps = 1;
+
+      exti.Line = EXTI_LINE_9;
+      HAL_EXTI_GenerateSWI(&exti);
     }
 
   } else if (GPIO_Pin == GPIO_PIN_9) {
@@ -735,14 +736,14 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     // Else, it has been triggered by main ot timer and
     // The packet won't be complete
 
+    // Tell that transfer is occuring
+    buffering_timestamps = 1;
+
     uint32_t pulses_to_sent = pulses_detected - pulses_sent;
     if(pulses_to_sent > timestamps_buffer_size) {
       pulses_to_sent = timestamps_buffer_size;
     } else if(pulses_to_sent < timestamps_buffer_size) {
       UART_Printf("pulses_to_sent (%d) < timestamps_buffer_size\r\n", pulses_to_sent);
-
-      // Tell that transfer is occuring
-      transfering_timestamps = 1;
     }
 
     // Prepare and send udp packets
@@ -751,13 +752,36 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     uint32_t current_index = pulses_sent%timestamps_size;
     uint32_t* current_timestamps = timestamps + current_index;
 
-    // If sending end and beggining of buffer
+    uint32_t* current_timestamps_buffer = timestamps_buffer;
+
+    uint32_t pulse_part_size = pulses_to_sent;
+
+    // If buffering end and beggining of buffer
     if(current_index + pulses_to_sent > timestamps_size) {
-      UART_Printf("current_index + pulses_to_sent > timestamps_size\r\n");
+      // UART_Printf("current_index + pulses_to_sent > timestamps_size\r\n");
+
+      pulse_part_size = timestamps_size - current_index;
+
+      // Copy last part
+      memcpy(current_timestamps_buffer, current_timestamps,
+        pulse_part_size*sizeof(uint32_t));
+
+      // Move pointer to first part
+      current_timestamps = timestamps;
+      current_timestamps_buffer += pulse_part_size;
+
+      // Decrement number of pulses to send
+      pulse_part_size = pulses_to_sent - pulse_part_size;
     }
 
     // Copy current content to apropriate buffer
-    memcpy(timestamps_buffer, current_timestamps, pulses_to_sent*sizeof(uint32_t));
+    memcpy(current_timestamps_buffer, current_timestamps, pulse_part_size*sizeof(uint32_t));
+
+    // Update number of pulses sent
+    pulses_sent += pulses_to_sent;
+
+    // Mark transfer as finished
+    buffering_timestamps = 0;
 
     // prepare UDP packet pointers and size
     uint8_t* udp_packet = (uint8_t*) timestamps_buffer;
@@ -770,12 +794,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
     // Mark timestamps_buffer
     memset(timestamps_buffer, 0xFF, timestamps_buffer_size*sizeof(uint32_t));
-
-    // Update number of pulses sent
-    pulses_sent += pulses_to_sent;
-
-    // Mark transfer as finished
-    transfering_timestamps = 0;
   }
 }
 
