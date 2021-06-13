@@ -691,6 +691,7 @@ static void EXTI_IRQHandler_Config(void)
 
   /* Enable GPIOC clock */
   EXTIx_CLK_ENABLE();
+  SWIx_CLK_ENABLE();
 
   /* Configure PB.4 pin as input floating */
   GPIO_InitStructure.Mode = GPIO_MODE_IT_RISING;
@@ -705,12 +706,12 @@ static void EXTI_IRQHandler_Config(void)
   /* Configure PB.4 pin as input floating */
   GPIO_InitStructure.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStructure.Pull = GPIO_PULLDOWN;
-  GPIO_InitStructure.Pin = GPIO_PIN_9;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStructure);
+  GPIO_InitStructure.Pin = SWIx_PIN;
+  HAL_GPIO_Init(SWIx_GPIO_PORT, &GPIO_InitStructure);
 
   /* Enable and set EXTI line 4 Interrupt to the lowest priority */
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 4, 0);
-  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+  HAL_NVIC_SetPriority(SWIx_IRQn, 4, 0);
+  HAL_NVIC_EnableIRQ(SWIx_IRQn);
 }
 
 /**
@@ -743,7 +744,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
       HAL_EXTI_GenerateSWI(&exti);
     }
 
-  } else if (GPIO_Pin == GPIO_PIN_9) {
+  } else if (GPIO_Pin == SWIx_PIN) {
 
     // Get the number of pulse timestamps to send
     // If higher than step one, it will be step one

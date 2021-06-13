@@ -142,6 +142,14 @@
 #define EXTIx_PIN                      GPIO_PIN_10
 #define EXTIx_GPIO_PORT                GPIOB
 
+/* Definition for software interrupts */
+
+#define SWIx_IRQHandler                EXTI9_5_IRQHandler
+#define SWIx_IRQn                      EXTI9_5_IRQn
+#define SWIx_CLK_ENABLE()               __HAL_RCC_GPIOC_CLK_ENABLE()
+#define SWIx_PIN                       GPIO_PIN_9
+#define SWIx_GPIO_PORT                 GPIOC
+
 /* w5500 stuff */
 
 #define W5500_CS_Pin                   GPIO_PIN_6

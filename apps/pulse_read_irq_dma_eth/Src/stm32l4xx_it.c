@@ -216,9 +216,9 @@ void EXTIx_IRQHandler(void)
   * @param  None
   * @retval None
   */
-void EXTI9_5_IRQHandler(void)
+void SWIx_IRQHandler(void)
 {
-  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_9);
+  HAL_GPIO_EXTI_IRQHandler(SWIx_PIN);
 }
 
 /**
