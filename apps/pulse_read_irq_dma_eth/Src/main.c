@@ -691,13 +691,19 @@ static void EXTI_IRQHandler_Config(void)
 
   /* Enable GPIOC clock */
   EXTIx_0_CLK_ENABLE();
+  EXTIx_1_CLK_ENABLE();
   SWIx_0_CLK_ENABLE();
+  SWIx_1_CLK_ENABLE();
 
   /* Configure PB.4 pin as input floating */
   GPIO_InitStructure.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStructure.Pull = GPIO_PULLDOWN;
+
   GPIO_InitStructure.Pin = EXTIx_0_PIN;
   HAL_GPIO_Init(EXTIx_0_GPIO_PORT, &GPIO_InitStructure);
+
+  GPIO_InitStructure.Pin = EXTIx_1_PIN;
+  HAL_GPIO_Init(EXTIx_1_GPIO_PORT, &GPIO_InitStructure);
 
   /* Enable and set EXTI line 4 Interrupt to the lowest priority */
   HAL_NVIC_SetPriority(EXTIx_IRQn, 0, 0);
@@ -706,8 +712,12 @@ static void EXTI_IRQHandler_Config(void)
   /* Configure PB.4 pin as input floating */
   GPIO_InitStructure.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStructure.Pull = GPIO_PULLDOWN;
+
   GPIO_InitStructure.Pin = SWIx_0_PIN;
   HAL_GPIO_Init(SWIx_0_GPIO_PORT, &GPIO_InitStructure);
+
+  GPIO_InitStructure.Pin = SWIx_1_PIN;
+  HAL_GPIO_Init(SWIx_1_GPIO_PORT, &GPIO_InitStructure);
 
   /* Enable and set EXTI line 4 Interrupt to the lowest priority */
   HAL_NVIC_SetPriority(SWIx_IRQn, 4, 0);

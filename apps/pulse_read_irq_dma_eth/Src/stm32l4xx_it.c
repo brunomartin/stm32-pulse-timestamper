@@ -209,6 +209,7 @@ void USARTx_DMA_TX_IRQHandler(void)
 void EXTIx_IRQHandler(void)
 {
   HAL_GPIO_EXTI_IRQHandler(EXTIx_0_PIN);
+  HAL_GPIO_EXTI_IRQHandler(EXTIx_1_PIN);
 }
 
 /**
@@ -219,6 +220,7 @@ void EXTIx_IRQHandler(void)
 void SWIx_IRQHandler(void)
 {
   HAL_GPIO_EXTI_IRQHandler(SWIx_0_PIN);
+  HAL_GPIO_EXTI_IRQHandler(SWIx_1_PIN);
 }
 
 /**

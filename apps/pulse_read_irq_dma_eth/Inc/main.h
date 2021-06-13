@@ -141,6 +141,9 @@
 #define EXTIx_0_CLK_ENABLE()            __HAL_RCC_GPIOB_CLK_ENABLE()
 #define EXTIx_0_PIN                    GPIO_PIN_10
 #define EXTIx_0_GPIO_PORT              GPIOB
+#define EXTIx_1_CLK_ENABLE()            __HAL_RCC_GPIOC_CLK_ENABLE()
+#define EXTIx_1_PIN                    GPIO_PIN_11
+#define EXTIx_1_GPIO_PORT              GPIOC
 
 /* Definition for software interrupts */
 
@@ -149,6 +152,9 @@
 #define SWIx_0_CLK_ENABLE()            __HAL_RCC_GPIOC_CLK_ENABLE()
 #define SWIx_0_PIN                     GPIO_PIN_9
 #define SWIx_0_GPIO_PORT               GPIOC
+#define SWIx_1_CLK_ENABLE()            __HAL_RCC_GPIOC_CLK_ENABLE()
+#define SWIx_1_PIN                     GPIO_PIN_8
+#define SWIx_1_GPIO_PORT               GPIOC
 
 /* w5500 stuff */
 
