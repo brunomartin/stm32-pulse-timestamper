@@ -119,7 +119,7 @@ __IO uint8_t buffering_timestamps = 0;
 
 __IO uint32_t packets_sent[2] = {0, 0};
 
-__IO uint32_t last_packet_time_ms = -1;
+__IO uint32_t last_packet_time_ms[2] = {-1, -1};
 
 // address is the destination IP address where to
 // send timestamps when { 255, 255, 255, 255 }, it waits
@@ -285,8 +285,6 @@ int main(void)
 
   int8_t force_send_packets = 0;
 
-  uint32_t last_detected_pulse_time_ms = -1;
-
   UART_Printf("Filling RAM and Tx buffer...\n\r");
   // Fill Tx buffer
   for(int i=0;i<timestamps_size;i+=timestamps_buffer_size) {
@@ -316,6 +314,7 @@ int main(void)
         UART_Printf("Timer wrapped\r\n");
       }
 
+      uint32_t last_detected_pulse_time_ms = -1;
       if(current_pulses_detected > 0) {
         uint32_t index = (current_pulses_detected-1)%timestamps_size;
         last_detected_pulse_time_ms = GetTimerTimeUsFromCounter(
@@ -348,9 +347,8 @@ int main(void)
       UART_Printf(
         "INFO:\r\n"
         "  current_time_ms: %d\r\n"
-        "  last_packet_time_ms: %d\r\n"
         ,
-        current_time_ms, last_packet_time_ms
+        current_time_ms
       );
       
       for(uint8_t line=0;line<2;line++) {
@@ -361,6 +359,7 @@ int main(void)
         uint32_t current_pulses_sent = pulses_sent[line];
         uint32_t pulses_to_sent = current_pulses_detected - current_pulses_sent;
 
+        uint32_t last_detected_pulse_time_ms = -1;
         if(current_pulses_detected > 0) {
           uint32_t index = (current_pulses_detected-1)%timestamps_size;
           last_detected_pulse_time_ms = GetTimerTimeUsFromCounter(
@@ -370,12 +369,13 @@ int main(void)
         UART_Printf(
           "Line %d:\r\n"
           "  last_detected_pulse_time_ms: %d\r\n"
+          "  last_packet_time_ms: %d\r\n"
           "  current_pulses_detected: %d\r\n"
           "  current_pulses_sent: %d\r\n"
           "  current_packets_sent: %d\r\n"
           "  pulses_to_sent: %d\r\n"
           ,
-          line, last_detected_pulse_time_ms,
+          line, last_detected_pulse_time_ms, last_packet_time_ms[line],
           current_pulses_detected, current_pulses_sent, current_packets_sent,
           pulses_to_sent
         );
@@ -861,7 +861,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     int32_t nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address,
       dest_ports[line]);
 
-    last_packet_time_ms = GetTimerTimeMs();
+    last_packet_time_ms[line] = GetTimerTimeMs();
     packets_sent[line]++;
 
     // Mark timestamps_buffer
