@@ -97,7 +97,7 @@ uint8_t dhcp_buffer[1024];
 uint8_t dns_buffer[1024];
 
 // Detection variables
-__IO uint32_t  pulses_detected = 0;
+__IO uint32_t  pulses_detected[2] = {0, 0};
 
 // Set timestamps vector size, be aware of the total RAM size (96kB on this one)
 // w5500 has max 16kB of Tx buffer to give to max 8 sockets
@@ -108,7 +108,7 @@ const uint32_t timestamps_size = 4*1024;
 // const uint32_t timestamps_size = 9*512;
 uint32_t* timestamps[2] = {0, 0};
 
-__IO uint32_t pulses_sent = 0;
+__IO uint32_t pulses_sent[2] = {0, 0};
 
 uint8_t udp_socket = UDP_SOCKET;
 int dest_port = 8042;
@@ -117,7 +117,7 @@ int dest_port = 8042;
 // avoiding sending same timestamps twice 
 __IO uint8_t buffering_timestamps = 0;
 
-__IO uint32_t packets_sent = 0;
+__IO uint32_t packets_sent[2] = {0, 0};
 
 __IO uint32_t last_packet_time_ms = -1;
 
@@ -304,10 +304,12 @@ int main(void)
   /* Wait all pulses have been detected */
   while (1) {
 
+    uint8_t line = 0;
+
     // Store volatile variables before testing them
-    uint32_t current_pulses_detected = pulses_detected;
-    uint32_t current_packets_sent = packets_sent;
-    uint32_t current_pulses_sent = pulses_sent;
+    uint32_t current_pulses_detected = pulses_detected[line];
+    uint32_t current_packets_sent = packets_sent[line];
+    uint32_t current_pulses_sent = pulses_sent[line];
 
     current_time_ms = GetTimerTimeMs();
     if(current_time_ms < last_print_time_ms) {
@@ -364,9 +366,11 @@ int main(void)
     HAL_Delay(10);
   }
 
+  uint8_t line = 0;
+
   UART_Printf("packets sent: %d\r\n", send_id);
   UART_Printf("pulses_to_detect: %d\r\n", pulses_to_detect);
-  UART_Printf("pulses_detected: %d\r\n", pulses_detected);
+  UART_Printf("pulses_detected: %d\r\n", pulses_detected[line]);
 
   UART_Printf("Enter infinite loop\r\n");
   
@@ -736,19 +740,20 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {  
   if (GPIO_Pin == EXTIx_0_PIN || GPIO_Pin == EXTIx_1_PIN) {
 
-    uint32_t index = pulses_detected%timestamps_size;
-
     uint8_t line = GPIO_Pin == EXTIx_0_PIN ? 0 : 1;
+
+    uint32_t index = pulses_detected[line]%timestamps_size;
+
     // And store counter value
     timestamps[line][index] = __HAL_TIM_GET_COUNTER(&htim);
 
     /* Increment detected pulses */
-    pulses_detected++;
+    pulses_detected[line]++;
 
     // If there is enough pulse timestamps to send and
     // the transfer is not already occuring, we can trigger
     // the software interrupt that will send the timestamps
-    if((pulses_detected >= pulses_sent + timestamps_buffer_size) &&
+    if((pulses_detected[line] >= pulses_sent[line] + timestamps_buffer_size) &&
       !buffering_timestamps) {
 
       // Tell that transfer is occuring unless it may reentre here
@@ -760,6 +765,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
   } else if (GPIO_Pin == SWIx_0_PIN || GPIO_Pin == SWIx_1_PIN) {
 
+    uint8_t line = GPIO_Pin == SWIx_0_PIN ? 0 : 1;
+
     // Get the number of pulse timestamps to send
     // If higher than step one, it will be step one
     // If it has been triggered by exti, then the number
@@ -770,7 +777,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     // Tell that transfer is occuring
     buffering_timestamps = 1;
 
-    uint32_t pulses_to_sent = pulses_detected - pulses_sent;
+    uint32_t pulses_to_sent = pulses_detected[line] - pulses_sent[line];
 
     // If there is no pulse to send then return
     if(pulses_to_sent == 0) {
@@ -784,10 +791,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     }
 
     // Prepare and send udp packets
-    uint8_t line = GPIO_Pin == SWIx_0_PIN ? 0 : 1;
 
     // Move pointer the first timestamp not already sent
-    uint32_t current_index = pulses_sent%timestamps_size;
+    uint32_t current_index = pulses_sent[line]%timestamps_size;
     uint32_t* current_timestamps = timestamps[line] + current_index;
 
     uint32_t* current_timestamps_buffer = timestamps_buffer;
@@ -816,7 +822,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     memcpy(current_timestamps_buffer, current_timestamps, pulse_part_size*sizeof(uint32_t));
 
     // Update number of pulses sent
-    pulses_sent += pulses_to_sent;
+    pulses_sent[line] += pulses_to_sent;
 
     // Mark transfer as finished
     buffering_timestamps = 0;
@@ -831,7 +837,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     int32_t nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, dest_port);
 
     last_packet_time_ms = GetTimerTimeMs();
-    packets_sent++;
+    packets_sent[line]++;
 
     // Mark timestamps_buffer
     memset(timestamps_buffer, 0xFF, timestamps_buffer_size*sizeof(uint32_t));
