@@ -106,7 +106,7 @@ __IO uint32_t  pulses_detected = 0;
 // 8kB for the line is ok, this 2*1024 uint32
 const uint32_t timestamps_size = 4*1024;
 // const uint32_t timestamps_size = 9*512;
-uint32_t* timestamps;
+uint32_t* timestamps[2] = {0, 0};
 
 __IO uint32_t pulses_sent = 0;
 
@@ -221,15 +221,18 @@ int main(void)
   /* Configure SPIx */
   SPI_Config();
 
-  timestamps = (uint32_t*) malloc(timestamps_size*sizeof(uint32_t));
+  timestamps[0] = (uint32_t*) malloc(timestamps_size*sizeof(uint32_t));
+  timestamps[1] = (uint32_t*) malloc(timestamps_size*sizeof(uint32_t));
   timestamps_buffer = (uint32_t*) malloc(timestamps_buffer_size*sizeof(uint32_t));
 
   for(size_t i=0;i<timestamps_size;i++) {
-    timestamps[i] = (uint32_t) i;
+    timestamps[0][i] = (uint32_t) i;
+    timestamps[1][i] = (uint32_t) i;
   }
 
   // Init timestamp buffer with magic number
-  memset(timestamps, 0xFF, timestamps_size*sizeof(uint32_t));
+  memset(timestamps[0], 0xFF, timestamps_size*sizeof(uint32_t));
+  memset(timestamps[1], 0xFF, timestamps_size*sizeof(uint32_t));
 
   // Mark timestamps_buffer
   memset(timestamps_buffer, 0xFF, timestamps_buffer_size*sizeof(uint32_t));
@@ -288,7 +291,7 @@ int main(void)
   // Fill Tx buffer
   for(int i=0;i<timestamps_size;i+=timestamps_buffer_size) {
 
-    current_timestamps = timestamps;
+    current_timestamps = timestamps[0];
     current_timestamps += i;
     
     uint8_t* udp_packet = (uint8_t*) timestamps_buffer;
@@ -314,7 +317,7 @@ int main(void)
     if(current_pulses_detected > 0) {
       uint32_t index = (current_pulses_detected-1)%timestamps_size;
       last_detected_pulse_time_ms = GetTimerTimeUsFromCounter(
-        timestamps[index]) / 1000;
+        timestamps[0][index]) / 1000;
     }
 
     uint32_t pulses_to_sent = 0;
@@ -731,12 +734,13 @@ static void EXTI_IRQHandler_Config(void)
   */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {  
-  if (GPIO_Pin == EXTIx_0_PIN) {
+  if (GPIO_Pin == EXTIx_0_PIN || GPIO_Pin == EXTIx_1_PIN) {
 
     uint32_t index = pulses_detected%timestamps_size;
 
+    uint8_t line = GPIO_Pin == EXTIx_0_PIN ? 0 : 1;
     // And store counter value
-    timestamps[index] = __HAL_TIM_GET_COUNTER(&htim);
+    timestamps[line][index] = __HAL_TIM_GET_COUNTER(&htim);
 
     /* Increment detected pulses */
     pulses_detected++;
@@ -754,7 +758,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
       HAL_EXTI_GenerateSWI(&exti);
     }
 
-  } else if (GPIO_Pin == SWIx_0_PIN) {
+  } else if (GPIO_Pin == SWIx_0_PIN || GPIO_Pin == SWIx_1_PIN) {
 
     // Get the number of pulse timestamps to send
     // If higher than step one, it will be step one
@@ -780,10 +784,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     }
 
     // Prepare and send udp packets
+    uint8_t line = GPIO_Pin == SWIx_0_PIN ? 0 : 1;
 
     // Move pointer the first timestamp not already sent
     uint32_t current_index = pulses_sent%timestamps_size;
-    uint32_t* current_timestamps = timestamps + current_index;
+    uint32_t* current_timestamps = timestamps[line] + current_index;
 
     uint32_t* current_timestamps_buffer = timestamps_buffer;
 
@@ -800,7 +805,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
         pulse_part_size*sizeof(uint32_t));
 
       // Move pointer to first part
-      current_timestamps = timestamps;
+      current_timestamps = timestamps[line];
       current_timestamps_buffer += pulse_part_size;
 
       // Decrement number of pulses to send
@@ -1232,7 +1237,7 @@ void udp_server_example() {
   for(int i=0;i<packes_to_send;i++) {
 
     uint16_t len = bytes_to_send;
-    uint8_t* buff = (uint8_t*)timestamps;
+    uint8_t* buff = (uint8_t*)timestamps[0];
 
     // duration = __HAL_TIM_GET_COUNTER(&htim);
     int32_t nbytes = sendto(udp_socket, buff, len, address, dest_port);
