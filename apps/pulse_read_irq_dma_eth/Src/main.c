@@ -304,42 +304,43 @@ int main(void)
   /* Wait all pulses have been detected */
   while (1) {
 
-    uint8_t line = 0;
+    for(uint8_t line=0;line<2;line++) {
 
-    // Store volatile variables before testing them
-    uint32_t current_pulses_detected = pulses_detected[line];
-    uint32_t current_packets_sent = packets_sent[line];
-    uint32_t current_pulses_sent = pulses_sent[line];
+      // Store volatile variables before testing them
+      uint32_t current_pulses_detected = pulses_detected[line];
+      uint32_t current_packets_sent = packets_sent[line];
+      uint32_t current_pulses_sent = pulses_sent[line];
 
-    current_time_ms = GetTimerTimeMs();
-    if(current_time_ms < last_print_time_ms) {
-      UART_Printf("Timer wrapped\r\n");
-    }
+      current_time_ms = GetTimerTimeMs();
+      if(current_time_ms < last_print_time_ms) {
+        UART_Printf("Timer wrapped\r\n");
+      }
 
-    if(current_pulses_detected > 0) {
-      uint32_t index = (current_pulses_detected-1)%timestamps_size;
-      last_detected_pulse_time_ms = GetTimerTimeUsFromCounter(
-        timestamps[0][index]) / 1000;
-    }
+      if(current_pulses_detected > 0) {
+        uint32_t index = (current_pulses_detected-1)%timestamps_size;
+        last_detected_pulse_time_ms = GetTimerTimeUsFromCounter(
+          timestamps[0][index]) / 1000;
+      }
 
-    uint32_t pulses_to_sent = 0;
+      uint32_t pulses_to_sent = 0;
 
-    // If there is still pulses to send after a duration (50ms) since
-    // last pulse detected, force sending theme it by triggering
-    // software interrupt
-    force_send_packets = 1;
-    force_send_packets &= current_pulses_detected > current_pulses_sent;
-    force_send_packets &= last_detected_pulse_time_ms != -1;
-    force_send_packets &= current_time_ms > last_detected_pulse_time_ms + 50;
-    force_send_packets &= !buffering_timestamps;
-    if(force_send_packets) {
-      pulses_to_sent = current_pulses_detected - current_pulses_sent;
-      UART_Printf("Force sending %d pulses\r\n", pulses_to_sent);
-      // Tell that transfer is occuring unless it may reentre here
-      buffering_timestamps = 1;
+      // If there is still pulses to send after a duration (50ms) since
+      // last pulse detected, force sending theme it by triggering
+      // software interrupt
+      force_send_packets = 1;
+      force_send_packets &= current_pulses_detected > current_pulses_sent;
+      force_send_packets &= last_detected_pulse_time_ms != -1;
+      force_send_packets &= current_time_ms > last_detected_pulse_time_ms + 50;
+      force_send_packets &= !buffering_timestamps;
+      if(force_send_packets) {
+        pulses_to_sent = current_pulses_detected - current_pulses_sent;
+        UART_Printf("Force sending %d pulses\r\n", pulses_to_sent);
+        // Tell that transfer is occuring unless it may reentre here
+        buffering_timestamps = 1;
 
-      exti.Line = EXTI_LINE_9;
-      HAL_EXTI_GenerateSWI(&exti);
+        exti.Line = EXTI_LINE_9;
+        HAL_EXTI_GenerateSWI(&exti);
+      }
     }
 
     duration = (current_time_ms - last_print_time_ms);
@@ -347,16 +348,39 @@ int main(void)
       UART_Printf(
         "INFO:\r\n"
         "  current_time_ms: %d\r\n"
-        "  last_detected_pulse_time_ms: %d\r\n"
         "  last_packet_time_ms: %d\r\n"
-        "  current_pulses_detected: %d\r\n"
-        "  current_pulses_sent: %d\r\n"
-        "  current_packets_sent: %d\r\n"
-        "  pulses_to_sent: %d\r\n"
         ,
-        current_time_ms, last_detected_pulse_time_ms, last_packet_time_ms,
-        current_pulses_detected, current_pulses_sent, current_packets_sent,
-        pulses_to_sent);
+        current_time_ms, last_packet_time_ms
+      );
+      
+      for(uint8_t line=0;line<2;line++) {
+
+        // Store volatile variables before testing them
+        uint32_t current_pulses_detected = pulses_detected[line];
+        uint32_t current_packets_sent = packets_sent[line];
+        uint32_t current_pulses_sent = pulses_sent[line];
+        uint32_t pulses_to_sent = current_pulses_detected - current_pulses_sent;
+
+        if(current_pulses_detected > 0) {
+          uint32_t index = (current_pulses_detected-1)%timestamps_size;
+          last_detected_pulse_time_ms = GetTimerTimeUsFromCounter(
+            timestamps[line][index]) / 1000;
+        }
+
+        UART_Printf(
+          "Line %d:\r\n"
+          "  last_detected_pulse_time_ms: %d\r\n"
+          "  current_pulses_detected: %d\r\n"
+          "  current_pulses_sent: %d\r\n"
+          "  current_packets_sent: %d\r\n"
+          "  pulses_to_sent: %d\r\n"
+          ,
+          line, last_detected_pulse_time_ms,
+          current_pulses_detected, current_pulses_sent, current_packets_sent,
+          pulses_to_sent
+        );
+
+      }
 
       last_print_time_ms = GetTimerTimeMs();
     }
