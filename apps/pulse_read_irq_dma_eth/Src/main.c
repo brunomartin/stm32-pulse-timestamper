@@ -111,7 +111,7 @@ uint32_t* timestamps[2] = {0, 0};
 __IO uint32_t pulses_sent[2] = {0, 0};
 
 uint8_t udp_socket = UDP_SOCKET;
-int dest_port = 8042;
+int dest_ports[2] = {8042, 8043};
 
 // buffering_timestamps tells that trabufferingnsfer is occuring
 // avoiding sending same timestamps twice 
@@ -247,7 +247,6 @@ int main(void)
   HAL_TIM_Base_Start(&htim);
 
   int server_port = 8041;
-  // int dest_port = 8042;
 
   udp_server_start(udp_socket, server_port, address);
 
@@ -255,7 +254,8 @@ int main(void)
       address[0], address[1], address[2], address[3]
   );
 
-  UART_Printf("Destination port: %d\r\n", dest_port);
+  UART_Printf("Destination ports: %d, %d\r\n",
+    dest_ports[0], dest_ports[1]);
 
   uint32_t pulses_to_detect = 1e6;
   // pulses_to_detect = 1e7;
@@ -834,7 +834,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     // Send it, following method will block until packet is sent
     // Interrupt accuring in the method has higher priority than
     // this one, so the method won't be block be this interrupt
-    int32_t nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, dest_port);
+    int32_t nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address,
+      dest_ports[line]);
 
     last_packet_time_ms = GetTimerTimeMs();
     packets_sent[line]++;
