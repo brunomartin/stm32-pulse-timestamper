@@ -130,7 +130,24 @@ uint8_t address[4] = { 192, 168, 1, 15 };
 
 EXTI_HandleTypeDef exti;
 
-// Set number of pulses to qait before sending packet
+// UDP packet fragment size in bytes, MSS is set
+// to this value, max is 1472 bytes
+// 4 bytes : packet id
+// 2 bytes : fragment id
+// 1024 bytes: 256 uint32 timestamps values
+#define TIMESTAMP_PER_FRAGMENT 256
+// #define UDP_FRAGMENT_SIZE 4 + 2 + TIMESTAMP_PER_PACKET * 4
+#define UDP_FRAGMENT_SIZE TIMESTAMP_PER_FRAGMENT * 4
+
+// 4 fragment seems to be ok to be sent
+// lower: too many UDP packet are sent
+// higher: too much to wait before sending a packet
+#define UDP_FRAGMENT_COUNT 4
+
+#define UDP_PACKET_SIZE UDP_FRAGMENT_COUNT * UDP_FRAGMENT_SIZE
+#define TIMESTAMP_PER_PACKET UDP_FRAGMENT_COUNT * TIMESTAMP_PER_FRAGMENT
+
+// Set number of pulses to wait before sending packet
 // const int timestamps_buffer_size = 2*1024; // too much, bad sent packets, std dev too high
 const int timestamps_buffer_size = 1*1024; // OK
 // const int timestamps_buffer_size = 512; // too low, bad sent packets, std dev too high
@@ -140,7 +157,7 @@ const int timestamps_buffer_size = 1*1024; // OK
 // timestamps_buffer_size = 1024/4;
 // timestamps_buffer_size = 1024/16;
 
-uint32_t* timestamps_buffer;
+uint8_t* udp_packet;
 
 struct Statistics {
   uint32_t count;
@@ -223,7 +240,7 @@ int main(void)
 
   timestamps[0] = (uint32_t*) malloc(timestamps_size*sizeof(uint32_t));
   timestamps[1] = (uint32_t*) malloc(timestamps_size*sizeof(uint32_t));
-  timestamps_buffer = (uint32_t*) malloc(timestamps_buffer_size*sizeof(uint32_t));
+  udp_packet = (uint8_t*) malloc(UDP_PACKET_SIZE);
 
   for(size_t i=0;i<timestamps_size;i++) {
     timestamps[0][i] = (uint32_t) i;
@@ -234,8 +251,8 @@ int main(void)
   memset(timestamps[0], 0xFF, timestamps_size*sizeof(uint32_t));
   memset(timestamps[1], 0xFF, timestamps_size*sizeof(uint32_t));
 
-  // Mark timestamps_buffer
-  memset(timestamps_buffer, 0xFF, timestamps_buffer_size*sizeof(uint32_t));
+  // Mark udp_packet
+  memset(udp_packet, 0xFF, UDP_PACKET_SIZE);
   
   /* Configure w5500 */
   W5500_Config();
@@ -257,44 +274,19 @@ int main(void)
   UART_Printf("Destination ports: %d, %d\r\n",
     dest_ports[0], dest_ports[1]);
 
-  uint32_t pulses_to_detect = 1e6;
-  // pulses_to_detect = 1e7;
-  pulses_to_detect = 1e5;
-  // pulses_to_detect = 1;
-  // pulses_to_detect = 0;
-  pulses_to_detect = 16*timestamps_size;
-  pulses_to_detect = 262144; // 2^18
-  // pulses_to_detect = 1048576; // 2^20
-  // pulses_to_detect = 4194304; // 2^22
-  // pulses_to_detect = 16777216; // 2^24
-  // pulses_to_detect = 2147483648; // 2^31
-
   struct Statistics stats;
-  int pulses_last_step = 0;
-  int pulses_next_step = timestamps_buffer_size;
-  uint32_t* current_timestamps = NULL;
-
-  uint32_t current_pulses_detected = 0;
-
-  int send_id = 0;
-  uint32_t total_stats_count = 0;
 
   uint32_t current_time_ms = GetTimerTimeMs();
   uint32_t last_print_time_ms = current_time_ms;
-  uint32_t duration;
-
-  int8_t force_send_packets = 0;
 
   UART_Printf("Filling RAM and Tx buffer...\n\r");
   // Fill Tx buffer
-  for(int i=0;i<timestamps_size;i+=timestamps_buffer_size) {
+  for(int i=0;i<timestamps_size;i+=TIMESTAMP_PER_PACKET) {
 
-    current_timestamps = timestamps[0];
+    uint32_t* current_timestamps = timestamps[0];
     current_timestamps += i;
     
-    uint8_t* udp_packet = (uint8_t*) timestamps_buffer;
-    uint32_t udp_packet_size = timestamps_buffer_size*sizeof(uint32_t);
-    int32_t nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address, 65535);
+    int32_t nbytes = sendto(udp_socket, udp_packet, UDP_PACKET_SIZE, address, 65535);
   }
 
   UART_Printf("****READY TO RECEIVE PULSES****\n\r");
@@ -326,7 +318,7 @@ int main(void)
       // If there is still pulses to send after a duration (50ms) since
       // last pulse detected, force sending theme it by triggering
       // software interrupt
-      force_send_packets = 1;
+      int8_t force_send_packets = 1;
       force_send_packets &= current_pulses_detected > current_pulses_sent;
       force_send_packets &= last_detected_pulse_time_ms != -1;
       force_send_packets &= current_time_ms > last_detected_pulse_time_ms + 50;
@@ -342,7 +334,7 @@ int main(void)
       }
     }
 
-    duration = (current_time_ms - last_print_time_ms);
+    uint32_t duration = (current_time_ms - last_print_time_ms);
     if(duration > 2000) {
       UART_Printf(
         "INFO:\r\n"
@@ -392,8 +384,6 @@ int main(void)
 
   uint8_t line = 0;
 
-  UART_Printf("packets sent: %d\r\n", send_id);
-  UART_Printf("pulses_to_detect: %d\r\n", pulses_to_detect);
   UART_Printf("pulses_detected: %d\r\n", pulses_detected[line]);
 
   UART_Printf("Enter infinite loop\r\n");
@@ -755,6 +745,10 @@ static void EXTI_IRQHandler_Config(void)
   HAL_NVIC_EnableIRQ(SWIx_IRQn);
 }
 
+void CopyFromTimestampToBuffer(uint32_t current_timestamp, uint32_t count) {
+
+}
+
 /**
   * @brief EXTI line detection callbacks
   * @param GPIO_Pin: Specifies the pins connected EXTI line
@@ -777,7 +771,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     // If there is enough pulse timestamps to send and
     // the transfer is not already occuring, we can trigger
     // the software interrupt that will send the timestamps
-    if((pulses_detected[line] >= pulses_sent[line] + timestamps_buffer_size) &&
+    if((pulses_detected[line] >= pulses_sent[line] + TIMESTAMP_PER_PACKET) &&
       !buffering_timestamps) {
 
       // Tell that transfer is occuring unless it may reentre here
@@ -810,8 +804,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
     // If number of pulse to send exceeds buffer, take only the first
     // missing ones will be sent next time
-    if(pulses_to_sent > timestamps_buffer_size) {
-      pulses_to_sent = timestamps_buffer_size;
+    if(pulses_to_sent > TIMESTAMP_PER_PACKET) {
+      pulses_to_sent = TIMESTAMP_PER_PACKET;
     }
 
     // Prepare and send udp packets
@@ -820,7 +814,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     uint32_t current_index = pulses_sent[line]%timestamps_size;
     uint32_t* current_timestamps = timestamps[line] + current_index;
 
-    uint32_t* current_timestamps_buffer = timestamps_buffer;
+    uint32_t* current_timestamps_buffer = (uint32_t*) udp_packet;
 
     uint32_t pulse_part_size = pulses_to_sent;
 
@@ -852,20 +846,18 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     buffering_timestamps = 0;
 
     // prepare UDP packet pointers and size
-    uint8_t* udp_packet = (uint8_t*) timestamps_buffer;
-    uint32_t udp_packet_size = timestamps_buffer_size*sizeof(uint32_t);
 
     // Send it, following method will block until packet is sent
     // Interrupt accuring in the method has higher priority than
     // this one, so the method won't be block be this interrupt
-    int32_t nbytes = sendto(udp_socket, udp_packet, udp_packet_size, address,
+    int32_t nbytes = sendto(udp_socket, udp_packet, UDP_PACKET_SIZE, address,
       dest_ports[line]);
 
     last_packet_time_ms[line] = GetTimerTimeMs();
     packets_sent[line]++;
 
-    // Mark timestamps_buffer
-    memset(timestamps_buffer, 0xFF, timestamps_buffer_size*sizeof(uint32_t));
+    // Mark udp_packet
+    memset(udp_packet, 0xFF, UDP_PACKET_SIZE);
   }
 }
 
@@ -1182,8 +1174,19 @@ void udp_server_start(uint8_t udp_socket, int server_port, uint8_t* address) {
 
   // Set sock options before instanciation
   // SO_MSS max seems to be 1472
-  uint16_t value = 1 << 10;
-  // value = 1 << 12;
+  // This is the MSS, Maximum Segment Size
+  // max is 1472 bytes
+  // If packet is above this size, it will
+  // be fragmented. WS5500 fragmented packets
+  // does not seem to be linked when receiving them
+  // So we have to add packet id and fragment so that
+  // a client may reassemble them
+  // packet strucure shall 
+  // | packet id | fragment number | timestamps         |
+  // | 4 bytes   | 2 bytes         | 256x4 = 1024 bytes |
+  // 
+  uint16_t value = 1024;
+  
   setsockopt(udp_socket, SO_MSS, &value);
 
   uint8_t flag = 0;
