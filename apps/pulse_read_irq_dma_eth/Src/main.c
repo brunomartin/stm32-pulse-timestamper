@@ -145,7 +145,7 @@ EXTI_HandleTypeDef exti;
 // fragments : packet id and fragment id
 // #define UDP_FRAGMENT_HEADER_SIZE 4 + 2
 #define UDP_FRAGMENT_HEADER_SIZE 0
-#define UDP_FRAGMENT_SIZE UDP_FRAGMENT_HEADER_SIZE + TIMESTAMP_PER_PACKET * TIMESTAMP_TYPE_SIZE
+#define UDP_FRAGMENT_SIZE (UDP_FRAGMENT_HEADER_SIZE + TIMESTAMP_PER_FRAGMENT * TIMESTAMP_TYPE_SIZE)
 
 // 4 fragment seems to be ok to be sent
 // lower: too many UDP packet are sent
@@ -153,8 +153,8 @@ EXTI_HandleTypeDef exti;
 #define UDP_FRAGMENT_COUNT 4
 
 // define useful constants
-#define UDP_PACKET_SIZE UDP_FRAGMENT_COUNT * UDP_FRAGMENT_SIZE
-#define TIMESTAMP_PER_PACKET UDP_FRAGMENT_COUNT * TIMESTAMP_PER_FRAGMENT
+#define UDP_PACKET_SIZE (UDP_FRAGMENT_COUNT * UDP_FRAGMENT_SIZE)
+#define TIMESTAMP_PER_PACKET (UDP_FRAGMENT_COUNT * TIMESTAMP_PER_FRAGMENT)
 
 uint8_t* udp_packet;
 
@@ -363,6 +363,9 @@ int main(void)
           current_pulses_detected, current_pulses_sent, current_packets_sent,
           pulses_to_sent
         );
+
+        UART_Printf("UDP_FRAGMENT_SIZE: %d\r\n", UDP_FRAGMENT_SIZE);
+        UART_Printf("UDP_PACKET_SIZE: %d\r\n", UDP_PACKET_SIZE);
 
       }
 
@@ -719,17 +722,12 @@ void CopyTimestampsToBuffer(uint32_t udp_packet_index,
 
   // If we trying to write bytes on fragment header,
   // Tell it !
-  if(udp_packet_index + count*TIMESTAMP_TYPE_SIZE > UDP_FRAGMENT_SIZE) {
-    UART_Printf(
-      "**** TEST ****\r\n"
-      "**** TEST ****\r\n"
-      "**** TEST ****\r\n"
-      "**** TEST ****\r\n"
-      "**** TEST ****\r\n"
-      "**** TEST ****\r\n"
-      );
-    // UART_Printf_No_Block("**** TEST ****\r\n");
-  }
+  // if(udp_packet_index + count*TIMESTAMP_TYPE_SIZE > UDP_FRAGMENT_SIZE) {
+  //   UART_Printf(
+  //     "**** TEST ****\r\n"
+  //     );
+  //   // UART_Printf_No_Block("**** TEST ****\r\n");
+  // }
 
   uint8_t* current_udp_packet = &udp_packet[udp_packet_index];
   memcpy(current_udp_packet, current_timestamp, count*TIMESTAMP_TYPE_SIZE);
