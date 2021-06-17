@@ -144,18 +144,9 @@ EXTI_HandleTypeDef exti;
 // higher: too much to wait before sending a packet
 #define UDP_FRAGMENT_COUNT 4
 
+// define useful constants
 #define UDP_PACKET_SIZE UDP_FRAGMENT_COUNT * UDP_FRAGMENT_SIZE
 #define TIMESTAMP_PER_PACKET UDP_FRAGMENT_COUNT * TIMESTAMP_PER_FRAGMENT
-
-// Set number of pulses to wait before sending packet
-// const int timestamps_buffer_size = 2*1024; // too much, bad sent packets, std dev too high
-const int timestamps_buffer_size = 1*1024; // OK
-// const int timestamps_buffer_size = 512; // too low, bad sent packets, std dev too high
-// const int timestamps_buffer_size = timestamps_size/4;
-// timestamps_buffer_size = timestamps_size/8;
-// timestamps_buffer_size = timestamps_size/16;
-// timestamps_buffer_size = 1024/4;
-// timestamps_buffer_size = 1024/16;
 
 uint8_t* udp_packet;
 
@@ -280,14 +271,11 @@ int main(void)
   uint32_t last_print_time_ms = current_time_ms;
 
   UART_Printf("Filling RAM and Tx buffer...\n\r");
-  // Fill Tx buffer
-  for(int i=0;i<timestamps_size;i+=TIMESTAMP_PER_PACKET) {
-
-    uint32_t* current_timestamps = timestamps[0];
-    current_timestamps += i;
-    
+  for(int i=0;i<2;i++) {
     int32_t nbytes = sendto(udp_socket, udp_packet, UDP_PACKET_SIZE, address, 65535);
   }
+
+  // HAL_Delay(5000);
 
   UART_Printf("****READY TO RECEIVE PULSES****\n\r");
 
