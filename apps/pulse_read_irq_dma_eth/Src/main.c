@@ -186,8 +186,6 @@ void udp_server_stop(uint8_t udp_socket);
 static void ComputeStats(const uint32_t* timestamps,
   uint32_t size, struct Statistics* stats);
 
-static void HAL_Delay_us(uint32_t ticks);
-
 static uint32_t GetTimerTimeUsFromCounter();
 static uint32_t GetTimerTimeUs();
 static uint32_t GetTimerTimeMs();
@@ -217,9 +215,6 @@ int main(void)
 
   /* Configure timer */
   Timer_Config();
-
-  /* Configure External line 13 (connected to PC.13 pin) in interrupt mode */
-  EXTI_IRQHandler_Config();
 
   /* Configure UART */
   UART_Config();
@@ -275,7 +270,8 @@ int main(void)
     int32_t nbytes = sendto(udp_socket, udp_packet, UDP_PACKET_SIZE, address, 65535);
   }
 
-  // HAL_Delay(5000);
+  /* Configure External line 13 (connected to PC.13 pin) in interrupt mode */
+  EXTI_IRQHandler_Config();
 
   UART_Printf("****READY TO RECEIVE PULSES****\n\r");
 
@@ -368,17 +364,6 @@ int main(void)
     // Delay of 1ms to let the MCU free, not too long to
     // avoid loosing packet to send
     HAL_Delay(10);
-  }
-
-  uint8_t line = 0;
-
-  UART_Printf("pulses_detected: %d\r\n", pulses_detected[line]);
-
-  UART_Printf("Enter infinite loop\r\n");
-  
-  /* Infinite loop */
-  while (1)
-  {
   }
 
   // Program won't go further if we stop udp server
@@ -553,25 +538,6 @@ static void ComputeStats(const uint32_t* timestamps, uint32_t size, struct Stati
     stats->max = elapsed > stats->max ? elapsed : stats->max;
     stats->min = elapsed < stats->min ? elapsed : stats->min;
   }
-}
-
-/**
-  * @brief  This function delays accurately.
-  * @param  ticks : number of system ticks to wait
-  * @retval None
-  */
-static void HAL_Delay_us(uint32_t ticks)
-{
-    SysTick->LOAD = ticks*10;
-    SysTick->VAL = 0;
-    SysTick->CTRL = SysTick_CTRL_ENABLE_Msk;
-    // SysTick->CTRL &= ~SYSTICK_CLKSOURCE_HCLK_DIV8;
-    // SysTick->CTRL |= SYSTICK_CLKSOURCE_HCLK;
-
-    // COUNTFLAG is a bit that is set to 1 when counter reaches 0.
-    // It's automatically cleared when read.
-    while ((SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) == 0);
-    SysTick->CTRL = 0;
 }
 
 /**
