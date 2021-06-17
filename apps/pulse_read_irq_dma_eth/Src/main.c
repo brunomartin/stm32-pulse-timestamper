@@ -132,12 +132,13 @@ EXTI_HandleTypeDef exti;
 
 // UDP packet fragment size in bytes, MSS is set
 // to this value, max is 1472 bytes
-// 4 bytes : packet id
-// 2 bytes : fragment id
-// 1024 bytes: 256 uint32 timestamps values
+// header : packet id + fragment id : 4 + 2 bytes
+// content : 1024 bytes: 256 uint32 timestamps values
 #define TIMESTAMP_PER_FRAGMENT 256
-// #define UDP_FRAGMENT_SIZE 4 + 2 + TIMESTAMP_PER_PACKET * 4
-#define UDP_FRAGMENT_SIZE TIMESTAMP_PER_FRAGMENT * 4
+#define TIMESTAMP_TYPE_SIZE sizeof(uint32_t)
+// #define UDP_FRAGMENT_HEADER_SIZE 4 + 2
+#define UDP_FRAGMENT_HEADER_SIZE 0
+#define UDP_FRAGMENT_SIZE UDP_FRAGMENT_HEADER_SIZE + TIMESTAMP_PER_PACKET * TIMESTAMP_TYPE_SIZE
 
 // 4 fragment seems to be ok to be sent
 // lower: too many UDP packet are sent
@@ -224,8 +225,8 @@ int main(void)
   /* Configure SPIx */
   SPI_Config();
 
-  timestamps[0] = (uint32_t*) malloc(timestamps_size*sizeof(uint32_t));
-  timestamps[1] = (uint32_t*) malloc(timestamps_size*sizeof(uint32_t));
+  timestamps[0] = (uint32_t*) malloc(timestamps_size*TIMESTAMP_TYPE_SIZE);
+  timestamps[1] = (uint32_t*) malloc(timestamps_size*TIMESTAMP_TYPE_SIZE);
   udp_packet = (uint8_t*) malloc(UDP_PACKET_SIZE);
 
   for(size_t i=0;i<timestamps_size;i++) {
@@ -234,8 +235,8 @@ int main(void)
   }
 
   // Init timestamp buffer with magic number
-  memset(timestamps[0], 0xFF, timestamps_size*sizeof(uint32_t));
-  memset(timestamps[1], 0xFF, timestamps_size*sizeof(uint32_t));
+  memset(timestamps[0], 0xFF, timestamps_size*TIMESTAMP_TYPE_SIZE);
+  memset(timestamps[1], 0xFF, timestamps_size*TIMESTAMP_TYPE_SIZE);
 
   // Mark udp_packet
   memset(udp_packet, 0xFF, UDP_PACKET_SIZE);
@@ -266,7 +267,7 @@ int main(void)
   uint32_t last_print_time_ms = current_time_ms;
 
   UART_Printf("Filling RAM and Tx buffer...\n\r");
-  for(int i=0;i<2;i++) {
+  for(int i=0;i<4;i++) {
     int32_t nbytes = sendto(udp_socket, udp_packet, UDP_PACKET_SIZE, address, 65535);
   }
 
@@ -709,8 +710,18 @@ static void EXTI_IRQHandler_Config(void)
 void CopyTimestampsToBuffer(uint32_t udp_packet_index,
   uint32_t* current_timestamp, uint32_t count) {
 
+  if(udp_packet_index + count*TIMESTAMP_TYPE_SIZE > UDP_FRAGMENT_SIZE) {
+    UART_Printf_No_Block("**** TEST ****\r\n");
+    // UART_Printf_No_Block(
+    //   "**** TEST ****\r\n"
+    //   "udp_packet_index: %d\r\n"
+    //   "count*sizeof(uint32_t): %d\r\n",
+    //   "UDP_FRAGMENT_SIZE: %d\r\n",
+    //   udp_packet_index, count*sizeof(uint32_t), UDP_FRAGMENT_SIZE);
+  }
+
   uint8_t* current_udp_packet = &udp_packet[udp_packet_index];
-  memcpy(current_udp_packet, current_timestamp, count*sizeof(uint32_t));
+  memcpy(current_udp_packet, current_timestamp, count*TIMESTAMP_TYPE_SIZE);
 }
 
 /**
@@ -792,7 +803,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
       // Move pointer to first part
       current_timestamps = timestamps[line];
 
-      udp_packet_index += pulse_part_size*sizeof(uint32_t);
+      udp_packet_index += pulse_part_size*TIMESTAMP_TYPE_SIZE;
 
       // Decrement number of pulses to send
       pulse_part_size = pulses_to_sent - pulse_part_size;
