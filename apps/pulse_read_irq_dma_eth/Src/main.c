@@ -363,10 +363,6 @@ int main(void)
           current_pulses_detected, current_pulses_sent, current_packets_sent,
           pulses_to_sent
         );
-
-        UART_Printf("UDP_FRAGMENT_SIZE: %d\r\n", UDP_FRAGMENT_SIZE);
-        UART_Printf("UDP_PACKET_SIZE: %d\r\n", UDP_PACKET_SIZE);
-
       }
 
       last_print_time_ms = GetTimerTimeMs();
