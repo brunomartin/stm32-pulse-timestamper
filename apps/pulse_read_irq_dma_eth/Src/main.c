@@ -729,7 +729,7 @@ void CopyTimestampsToBuffer(uint8_t line, uint32_t timestamp_index, uint32_t cou
       memcpy(current_udp_packet, current_timestamp, part*TIMESTAMP_TYPE_SIZE);
 
       // update copy variables
-      current_timestamp = 0;
+      current_timestamp = timestamps[line];
       current_udp_packet += part*TIMESTAMP_TYPE_SIZE;
       count -= part;
   }
