@@ -699,8 +699,18 @@ static void EXTI_IRQHandler_Config(void)
   HAL_NVIC_EnableIRQ(SWIx_IRQn);
 }
 
-void CopyFromTimestampToBuffer(uint32_t current_timestamp, uint32_t count) {
+/**
+  * @brief Copy timestamp content to UDP packet
+  * @param udp_packet_index: index in byte of the UDP packet location to fill
+  * @param current_timestamp: pointer to timestamp to copy from
+  * @param count: number of timestamp to copy
+  * @retval None
+  */
+void CopyTimestampsToBuffer(uint32_t udp_packet_index,
+  uint32_t* current_timestamp, uint32_t count) {
 
+  uint8_t* current_udp_packet = &udp_packet[udp_packet_index];
+  memcpy(current_udp_packet, current_timestamp, count*sizeof(uint32_t));
 }
 
 /**
@@ -768,30 +778,28 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     uint32_t current_index = pulses_sent[line]%timestamps_size;
     uint32_t* current_timestamps = timestamps[line] + current_index;
 
-    uint32_t* current_timestamps_buffer = (uint32_t*) udp_packet;
-
     uint32_t pulse_part_size = pulses_to_sent;
+
+    uint32_t udp_packet_index = 0;
 
     // If buffering end and beggining of buffer
     if(current_index + pulses_to_sent > timestamps_size) {
-      // UART_Printf("current_index + pulses_to_sent > timestamps_size\r\n");
-
       pulse_part_size = timestamps_size - current_index;
 
       // Copy last part
-      memcpy(current_timestamps_buffer, current_timestamps,
-        pulse_part_size*sizeof(uint32_t));
+      CopyTimestampsToBuffer(udp_packet_index, current_timestamps, pulse_part_size);
 
       // Move pointer to first part
       current_timestamps = timestamps[line];
-      current_timestamps_buffer += pulse_part_size;
+
+      udp_packet_index += pulse_part_size*sizeof(uint32_t);
 
       // Decrement number of pulses to send
       pulse_part_size = pulses_to_sent - pulse_part_size;
     }
 
     // Copy current content to apropriate buffer
-    memcpy(current_timestamps_buffer, current_timestamps, pulse_part_size*sizeof(uint32_t));
+    CopyTimestampsToBuffer(udp_packet_index, current_timestamps, pulse_part_size);
 
     // Update number of pulses sent
     pulses_sent[line] += pulses_to_sent;
