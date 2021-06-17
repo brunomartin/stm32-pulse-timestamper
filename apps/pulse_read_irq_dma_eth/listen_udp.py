@@ -30,6 +30,10 @@ counter_precision = 1.0 # 1MHz
 counter_precision = 0.1 # 10MHz
 counter_precision = 0.0125 # 80MHz
 
+# minimum rate to detect in Hz, if period is higher, continguous
+# timestamp analysis is reset
+min_rate = 10.0
+
 # UDP packet size
 packet_size = fragment_count*fragment_size
 
@@ -82,7 +86,7 @@ while True:
     count, fragment_count, wait_duration*1e3, transfer_duration*1e6, pulses))
 
   # if we waited too long, throw away last timestamps
-  if wait_duration < 1e6:
+  if wait_duration > 1/min_rate:
     last_timestamps = []
 
   # concatenate with last timestamps to ensure continuity
@@ -142,3 +146,4 @@ while True:
       "% std_dev > 10 %\n"
       "%%%%%%%%%%%%%%%%"
       )
+    exit(-1)

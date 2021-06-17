@@ -135,7 +135,14 @@ EXTI_HandleTypeDef exti;
 // header : packet id + fragment id : 4 + 2 bytes
 // content : 1024 bytes: 256 uint32 timestamps values
 #define TIMESTAMP_PER_FRAGMENT 256
+
+// timestamp type size in bytes, according to chosen Timer
+// It can be uin16 or uint32, TIM2 is uint32
 #define TIMESTAMP_TYPE_SIZE sizeof(uint32_t)
+
+// WS550 fragments udp packets and it seems that these packet
+// cannot be re assembled by client. So we add an header to these
+// fragments : packet id and fragment id
 // #define UDP_FRAGMENT_HEADER_SIZE 4 + 2
 #define UDP_FRAGMENT_HEADER_SIZE 0
 #define UDP_FRAGMENT_SIZE UDP_FRAGMENT_HEADER_SIZE + TIMESTAMP_PER_PACKET * TIMESTAMP_TYPE_SIZE
@@ -710,14 +717,18 @@ static void EXTI_IRQHandler_Config(void)
 void CopyTimestampsToBuffer(uint32_t udp_packet_index,
   uint32_t* current_timestamp, uint32_t count) {
 
+  // If we trying to write bytes on fragment header,
+  // Tell it !
   if(udp_packet_index + count*TIMESTAMP_TYPE_SIZE > UDP_FRAGMENT_SIZE) {
-    UART_Printf_No_Block("**** TEST ****\r\n");
-    // UART_Printf_No_Block(
-    //   "**** TEST ****\r\n"
-    //   "udp_packet_index: %d\r\n"
-    //   "count*sizeof(uint32_t): %d\r\n",
-    //   "UDP_FRAGMENT_SIZE: %d\r\n",
-    //   udp_packet_index, count*sizeof(uint32_t), UDP_FRAGMENT_SIZE);
+    UART_Printf(
+      "**** TEST ****\r\n"
+      "**** TEST ****\r\n"
+      "**** TEST ****\r\n"
+      "**** TEST ****\r\n"
+      "**** TEST ****\r\n"
+      "**** TEST ****\r\n"
+      );
+    // UART_Printf_No_Block("**** TEST ****\r\n");
   }
 
   uint8_t* current_udp_packet = &udp_packet[udp_packet_index];
@@ -1159,6 +1170,7 @@ void udp_server_start(uint8_t udp_socket, int server_port, uint8_t* address) {
   // | 4 bytes   | 2 bytes         | 256x4 = 1024 bytes |
   // 
   uint16_t value = 1024;
+  // uint16_t value = UDP_FRAGMENT_SIZE;
   
   setsockopt(udp_socket, SO_MSS, &value);
 
