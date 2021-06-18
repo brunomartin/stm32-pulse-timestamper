@@ -125,8 +125,8 @@ __IO uint32_t last_packet_time_ms[2] = {-1, -1};
 // send timestamps when { 255, 255, 255, 255 }, it waits
 // for client connection
 // uint8_t address[4] = { 255, 255, 255, 255 };
-// uint8_t address[4] = { 192, 168, 1, 12 };
-uint8_t address[4] = { 192, 168, 1, 40 };
+uint8_t address[4] = { 192, 168, 1, 12 };
+// uint8_t address[4] = { 192, 168, 1, 40 };
 
 EXTI_HandleTypeDef exti;
 

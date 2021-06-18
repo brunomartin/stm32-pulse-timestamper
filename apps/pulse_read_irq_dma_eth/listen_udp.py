@@ -115,6 +115,9 @@ while True:
 
   process_time = time.time()
 
+  # we can find a way to count valid timestamps
+  # without soedning too much time
+
   if compute_stats:
 
     # convert data to uint32 array
