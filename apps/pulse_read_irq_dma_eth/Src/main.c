@@ -739,6 +739,7 @@ uint16_t CopyTimestampsToBuffer(uint16_t udp_packet_index, uint8_t line,
   // next data section
   if(fragment_index < UDP_FRAGMENT_HEADER_SIZE) {
     udp_packet_index += UDP_FRAGMENT_HEADER_SIZE - fragment_index;
+    fragment_index = udp_packet_index%UDP_FRAGMENT_SIZE;
   }
 
   if(udp_packet_index + count*TIMESTAMP_TYPE_SIZE > UDP_PACKET_SIZE) {
