@@ -118,14 +118,12 @@ while True:
 
   pulses += len(new_timestamps)
 
-  # print it for information
-  print("{}: fragments: {}, waited: {:6.2f}ms, transfer: {:3.0f}us, pulses: {}".format(
-    packet_id, fragment_count, wait_duration*1e3, transfer_duration*1e6, pulses))
-
   # if we waited too long, throw away last timestamps
   if wait_duration > 1/min_rate:
     last_timestamps = []
     last_packet_id = -1
+
+  process_time = time.time()
 
   # concatenate with last timestamps to ensure continuity
   # if we did not wait too long
@@ -173,10 +171,17 @@ while True:
   if average != 0:
     rate = 1/average
 
+  process_duration = time.time() - process_time
+
   # print statistics
   print("  average: {:.2f}us, dev: {:5.2f}us, min: {:5.2f}us,"
     " max: {:5.2f}us, rate: {:.2f}kHz".format(
     average, std_dev, min, max, rate*1000))
+
+  # print it for information
+  print("{}: waited: {:6.2f}ms, transfer: {:3.0f}us, process:{:3.0f}ms, pulses: {}"
+    .format(packet_id, wait_duration*1e3, transfer_duration*1e6,
+    process_duration*1e3, pulses))
 
   if std_dev > 10:
     print(
