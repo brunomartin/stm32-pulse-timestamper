@@ -50,6 +50,8 @@ timestamps = []
 new_timestamps = []
 last_timestamps = []
 
+last_packet_id = -1
+
 concatenat_timestamps = True
 
 durations = []
@@ -94,6 +96,20 @@ while True:
   packet_id = headers[1]
   fragment_id = headers[2]
 
+  # Detect discontinuation in packet ids
+  if last_packet_id == -1:
+    last_packet_id = packet_id
+  else:
+    if packet_id == last_packet_id + 1:
+      last_packet_id = packet_id
+    else:
+      print(
+        "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n"
+        "% packet_id {} != last_packet_id + 1 {} %\n"
+        "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n"
+        .format(packet_id, last_packet_id + 1))
+      exit(-1)
+
   # convert data to uint32 array
   new_timestamps = list(struct.unpack('{}I'.format(int(len(data) / 4)), data))
 
@@ -109,6 +125,7 @@ while True:
   # if we waited too long, throw away last timestamps
   if wait_duration > 1/min_rate:
     last_timestamps = []
+    last_packet_id = -1
 
   # concatenate with last timestamps to ensure continuity
   # if we did not wait too long
