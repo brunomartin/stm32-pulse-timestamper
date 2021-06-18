@@ -33,6 +33,9 @@ counter_precision = 0.0125 # 80MHz
 # timestamp analysis is reset
 min_rate = 10.0
 
+# Tell if we want to compute statistics or not
+compute_stats = True
+
 # UDP packet size
 fragment_size = fragment_header_size + fragment_data_size
 packet_size = fragment_count*fragment_size
@@ -125,68 +128,71 @@ while True:
 
   process_time = time.time()
 
-  # concatenate with last timestamps to ensure continuity
-  # if we did not wait too long
-  if concatenat_timestamps:
-    timestamps = last_timestamps + new_timestamps
-    last_timestamps = new_timestamps
-  else:
-    timestamps = new_timestamps
+  if compute_stats:
 
-  # unwrap timestamps according to counter period
-  for i in range(1, len(timestamps)):
-    while timestamps[i] - timestamps[i-1] < -counter_period/2:
-      timestamps[i] += counter_period
+    # concatenate with last timestamps to ensure continuity
+    # if we did not wait too long
+    if concatenat_timestamps:
+      timestamps = last_timestamps + new_timestamps
+      last_timestamps = new_timestamps
+    else:
+      timestamps = new_timestamps
 
-  # convert timestamps to float
-  for i in range(len(timestamps)):
-    timestamps[i] = float(timestamps[i])
+    # unwrap timestamps according to counter period
+    for i in range(1, len(timestamps)):
+      while timestamps[i] - timestamps[i-1] < -counter_period/2:
+        timestamps[i] += counter_period
 
-  if len(timestamps) == 1:
-    continue
+    # convert timestamps to float
+    for i in range(len(timestamps)):
+      timestamps[i] = float(timestamps[i])
 
-  # compute durations from timestamps
-  durations = [(timestamps[i] - timestamps[i-1]) for i in range(1, len(timestamps)-1)]
+    if len(timestamps) == 1:
+      continue
 
-  # apply conversion according to precision
-  durations = [ duration*counter_precision for duration in durations]
+    # compute durations from timestamps
+    durations = [(timestamps[i] - timestamps[i-1]) for i in range(1, len(timestamps)-1)]
 
-  # compute statistics
-  average = 0
-  min = durations[0]
-  max = durations[0]
-  for duration in durations:
-    average += duration
-    min = duration if duration < min else min
-    max = duration if duration > max else max
-  average /= len(durations)
+    # apply conversion according to precision
+    durations = [ duration*counter_precision for duration in durations]
 
-  std_dev = 0
-  for duration in durations:
-    std_dev += (duration - average)**2
-  std_dev /= len(durations)
-  std_dev = math.sqrt(std_dev)
+    # compute statistics
+    average = 0
+    min = durations[0]
+    max = durations[0]
+    for duration in durations:
+      average += duration
+      min = duration if duration < min else min
+      max = duration if duration > max else max
+    average /= len(durations)
 
-  rate = math.nan
-  if average != 0:
-    rate = 1/average
+    std_dev = 0
+    for duration in durations:
+      std_dev += (duration - average)**2
+    std_dev /= len(durations)
+    std_dev = math.sqrt(std_dev)
+
+    rate = math.nan
+    if average != 0:
+      rate = 1/average
+
+    if std_dev > 10:
+      print(
+        "%%%%%%%%%%%%%%%%\n"
+        "% std_dev > 10 %\n"
+        "%%%%%%%%%%%%%%%%"
+        )
+      exit(-1)
 
   process_duration = time.time() - process_time
 
-  # print statistics
-  print("  average: {:.2f}us, dev: {:5.2f}us, min: {:5.2f}us,"
-    " max: {:5.2f}us, rate: {:.2f}kHz".format(
-    average, std_dev, min, max, rate*1000))
+  # print statistics if we computed them
+  if compute_stats:
+    print("  average: {:.2f}us, dev: {:5.2f}us, min: {:5.2f}us,"
+      " max: {:5.2f}us, rate: {:.2f}kHz".format(
+      average, std_dev, min, max, rate*1000))
 
   # print it for information
   print("{}: waited: {:4.1f}ms, transfer: {:3.0f}us, process:{:4.1f}ms, pulses: {}"
     .format(packet_id, wait_duration*1e3, transfer_duration*1e6,
     process_duration*1e3, pulses))
-
-  if std_dev > 10:
-    print(
-      "%%%%%%%%%%%%%%%%\n"
-      "% std_dev > 10 %\n"
-      "%%%%%%%%%%%%%%%%"
-      )
-    exit(-1)
