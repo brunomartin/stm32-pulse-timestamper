@@ -72,10 +72,6 @@ while True:
       header_end = header_start + fragment_header_size
       header[header_start:header_end] = fragment[:fragment_header_size]
 
-      # packet_id, real_fragment_id = struct.unpack('IB', fragment[:fragment_header_size])
-
-      # print("{}, {}".format(packet_id, real_fragment_id))
-
     # extract data from fragment
     data_start = fragment_id * fragment_data_size
     data_end = data_start + fragment_data_size
@@ -91,7 +87,7 @@ while True:
   wait_duration_start = transfer_end_time
   transfer_duration = transfer_end_time - first_fragment_time
 
-  # unpack header content
+  # unpack header content : line_id, packet_id, fragment_id
   headers = list(struct.unpack('III' * fragment_count, header))
 
   line_id = headers[0]
