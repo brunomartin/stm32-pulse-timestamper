@@ -137,9 +137,9 @@ EXTI_HandleTypeDef exti;
 
 // UDP packet fragment size in bytes, MSS is set
 // to this value, max is 1472 bytes
-// header : packet id + fragment id : 4 + 4 bytes
-// content : 1016 bytes: 254 uint32 timestamps values
-#define TIMESTAMP_PER_FRAGMENT 254
+// header : packet id + fragment id : 4 + 2 bytes
+// content : 1016 bytes: 250 uint32 timestamps values
+#define TIMESTAMP_PER_FRAGMENT 250
 
 // timestamp type size in bytes, according to chosen Timer
 // It can be uin16 or uint32, TIM2 is uint32

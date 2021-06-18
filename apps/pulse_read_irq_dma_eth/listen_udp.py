@@ -18,7 +18,7 @@ count = 0
 
 # UDP packet sizes
 fragment_header_size = 8
-fragment_data_size = 1016
+fragment_data_size = 1000 # 250x4
 
 # UDP packet fragment count
 fragment_count = 4
