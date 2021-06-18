@@ -138,17 +138,17 @@ EXTI_HandleTypeDef exti;
 // UDP packet fragment size in bytes, MSS is set
 // to this value, max is 1472 bytes
 // header : line id + packet id + fragment id : 4 + 4 + 4 = 12 bytes
-// content : 1016 bytes: 250 uint32 timestamps values
+// content : 1000 bytes: 250 uint32 (4 bytes) timestamps values
+#define UDP_FRAGMENT_HEADER_SIZE 12
 #define TIMESTAMP_PER_FRAGMENT 250
 
 // timestamp type size in bytes, according to chosen Timer
-// It can be uin16 or uint32, TIM2 is uint32
+// It can be uin16 or uint32, TIM2 is uint32 (4 bytes)
 #define TIMESTAMP_TYPE_SIZE sizeof(uint32_t)
 
 // WS550 fragments udp packets and it seems that these packet
 // cannot be re assembled by client. So we add an header to these
 // fragments : packet id and fragment id
-#define UDP_FRAGMENT_HEADER_SIZE 12
 #define UDP_FRAGMENT_DATA_SIZE (TIMESTAMP_PER_FRAGMENT * TIMESTAMP_TYPE_SIZE)
 #define UDP_FRAGMENT_SIZE (UDP_FRAGMENT_HEADER_SIZE + UDP_FRAGMENT_DATA_SIZE)
 
@@ -255,9 +255,6 @@ int main(void)
 
   // Mark to ease detecting errors
   memset(udp_packet, 0xFF, UDP_PACKET_SIZE);
-
-  // Write packet and fragment ids for first packet to send 
-  WriteBufferHeaders(0, 1);
   
   /* Configure w5500 */
   W5500_Config();
@@ -897,9 +894,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     // Update number of pulses sent
     pulses_sent[line] += pulses_to_sent;
 
-    // if(pulses_sent[line] > 20000) {
-    //   Error_Handler();
-    // }
+    // Write line, packet and fragment ids for packet to send 
+    WriteBufferHeaders(0, packets_sent[line] + 1);
 
     // Mark transfer as finished
     buffering_timestamps = 0;
@@ -917,9 +913,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
     // Mark to ease detecting errors
     memset(udp_packet, 0xFF, UDP_PACKET_SIZE);
-
-    // Write packet and fragment ids for next packet to send 
-    WriteBufferHeaders(line, packets_sent[line] + 1);
   }
 }
 
