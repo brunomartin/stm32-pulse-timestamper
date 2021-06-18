@@ -145,7 +145,8 @@ EXTI_HandleTypeDef exti;
 // fragments : packet id and fragment id
 // #define UDP_FRAGMENT_HEADER_SIZE 4 + 2
 #define UDP_FRAGMENT_HEADER_SIZE 0
-#define UDP_FRAGMENT_SIZE (UDP_FRAGMENT_HEADER_SIZE + TIMESTAMP_PER_FRAGMENT * TIMESTAMP_TYPE_SIZE)
+#define UDP_FRAGMENT_DATA_SIZE (TIMESTAMP_PER_FRAGMENT * TIMESTAMP_TYPE_SIZE)
+#define UDP_FRAGMENT_SIZE (UDP_FRAGMENT_HEADER_SIZE + UDP_FRAGMENT_DATA_SIZE)
 
 // 4 fragment seems to be ok to be sent
 // lower: too many UDP packet are sent
@@ -153,6 +154,7 @@ EXTI_HandleTypeDef exti;
 #define UDP_FRAGMENT_COUNT 4
 
 // define useful constants
+#define UDP_PACKET_DATA_SIZE (UDP_FRAGMENT_COUNT * UDP_FRAGMENT_DATA_SIZE)
 #define UDP_PACKET_SIZE (UDP_FRAGMENT_COUNT * UDP_FRAGMENT_SIZE)
 #define TIMESTAMP_PER_PACKET (UDP_FRAGMENT_COUNT * TIMESTAMP_PER_FRAGMENT)
 
@@ -288,6 +290,7 @@ int main(void)
   /* Wait all pulses have been detected */
   while (1) {
 
+    // Following code look if there any timestamp detected to send
     for(uint8_t line=0;line<2;line++) {
 
       // Store volatile variables before testing them
@@ -329,7 +332,7 @@ int main(void)
     }
 
     uint32_t duration = (current_time_ms - last_print_time_ms);
-    if(duration > 5000) {
+    if(duration > 2000) {
       UART_Printf(
         "INFO:\r\n"
         "  current_time_ms: %d\r\n"
@@ -714,25 +717,60 @@ static void EXTI_IRQHandler_Config(void)
   * @param line: timestamp line to copy from
   * @param timestamp_index: index of first timestamp to copy
   * @param count: number of timestamp to copy
-  * @retval None
+  * @retval next position in bytes of the udp packt write cursor
   */
-void CopyTimestampsToBuffer(uint8_t line, uint32_t timestamp_index, uint32_t count) {
+uint16_t CopyTimestampsToBuffer(uint16_t udp_packet_index, uint8_t line,
+  uint32_t timestamp_index, uint32_t count) {
 
-  uint32_t* current_timestamp = timestamps[line] + timestamp_index;
-  uint8_t* current_udp_packet = udp_packet;
-
-  // If overlapping, copy the first part
-  if(timestamp_index + count > timestamps_size) {
-      uint32_t part = timestamps_size - timestamp_index;
-      memcpy(current_udp_packet, current_timestamp, part*TIMESTAMP_TYPE_SIZE);
-
-      // update copy variables
-      current_timestamp = timestamps[line];
-      current_udp_packet += part*TIMESTAMP_TYPE_SIZE;
-      count -= part;
+  if(count*TIMESTAMP_TYPE_SIZE > UDP_PACKET_DATA_SIZE) {
+    UART_Printf("Too much data to send !!!\r\n");
+    Error_Handler();
   }
 
-  memcpy(current_udp_packet, current_timestamp, count*TIMESTAMP_TYPE_SIZE);
+  uint16_t fragment_index = udp_packet_index%UDP_FRAGMENT_SIZE;
+
+  // If trying to write on one header part, move at the beginning of the
+  // next data section
+  if(fragment_index < UDP_FRAGMENT_HEADER_SIZE) {
+    udp_packet_index += UDP_FRAGMENT_HEADER_SIZE - fragment_index;
+  }
+
+  if(udp_packet_index + count*TIMESTAMP_TYPE_SIZE > UDP_PACKET_SIZE) {
+    UART_Printf("Trying to right out of UDP packet !!!\r\n");
+    Error_Handler();
+  }
+
+  // If writing the data overlaps the data section, write that part
+  // then next parts
+  if(fragment_index + count*TIMESTAMP_TYPE_SIZE > UDP_FRAGMENT_SIZE) {
+
+    // Copy the first part, this will copy for sure
+    uint32_t first_part_count = (UDP_FRAGMENT_SIZE - fragment_index)/TIMESTAMP_TYPE_SIZE;
+    udp_packet_index = CopyTimestampsToBuffer(udp_packet_index, line,
+      timestamp_index, first_part_count);
+
+    // Update cursor position and try to copy next part
+    // It may be too long too but it will finally succeed
+    timestamp_index += first_part_count;
+    uint32_t last_part_count = count - first_part_count;
+ 
+    // Call again this method, last part shall fit and won't enter
+    // this part of this section
+    udp_packet_index = CopyTimestampsToBuffer(udp_packet_index, line,
+      timestamp_index, last_part_count);
+  } else {
+    // All is good, we can copy
+    uint32_t* current_timestamp = timestamps[line] + timestamp_index;
+    uint8_t* current_udp_packet = udp_packet + udp_packet_index;
+    memcpy(current_udp_packet, current_timestamp, count*TIMESTAMP_TYPE_SIZE);
+
+    // Increment packet index for next write
+    udp_packet_index += count*TIMESTAMP_TYPE_SIZE;
+  }
+
+  // return the next position taking into account header move
+  // and total count written
+  return udp_packet_index;
 }
 
 /**
@@ -798,12 +836,30 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
     // Move pointer the first timestamp not already sent
     uint32_t current_index = pulses_sent[line]%timestamps_size;
+    uint16_t udp_packet_index = 0;
 
-    // Call copy buffer, if wrapping, it will do the necessary
-    CopyTimestampsToBuffer(line, current_index, pulses_to_sent);
+    // Call copy buffer, to let the copy focused on filling
+    // UDP buffer, check if overlapping here
+    // If overlapping, copy the first part
+    if(current_index + pulses_to_sent > timestamps_size) {
+      uint32_t part = timestamps_size - current_index;
+      udp_packet_index = CopyTimestampsToBuffer(udp_packet_index,
+          line, current_index, part);
+
+      // update copy variables
+      current_index = 0;
+      pulses_sent[line] += part;
+      pulses_to_sent -= part;
+    }
+
+    CopyTimestampsToBuffer(udp_packet_index, line, current_index, pulses_to_sent);
     
     // Update number of pulses sent
     pulses_sent[line] += pulses_to_sent;
+
+    // if(pulses_sent[line] > 20000) {
+    //   Error_Handler();
+    // }
 
     // Mark transfer as finished
     buffering_timestamps = 0;
