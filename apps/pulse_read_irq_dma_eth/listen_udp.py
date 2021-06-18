@@ -115,18 +115,16 @@ while True:
 
   process_time = time.time()
 
-  # we can find a way to count valid timestamps
-  # without soedning too much time
+  # convert data to uint32 array
+  new_timestamps = list(struct.unpack('{}I'.format(int(len(data) / 4)), data))
+
+  # remove trailing magic value if any
+  new_timestamps = [x for x in new_timestamps if x < counter_period]
+
+  # Increment total number of pulses from script start
+  pulses += len(new_timestamps)
 
   if compute_stats:
-
-    # convert data to uint32 array
-    new_timestamps = list(struct.unpack('{}I'.format(int(len(data) / 4)), data))
-
-    # remove trailing magic value if any
-    new_timestamps = [x for x in new_timestamps if x < counter_period]
-
-    pulses += len(new_timestamps)
 
     # if we waited too long, throw away last timestamps
     if wait_duration > 1/min_rate:
