@@ -17,7 +17,7 @@ sock.bind((UDP_IP, UDP_PORT))
 count = 0
 
 # UDP packet sizes
-fragment_header_size = 8
+fragment_header_size = 24
 fragment_data_size = 1000 # 250x4
 
 # UDP packet fragment count
@@ -90,6 +90,11 @@ while True:
 
   # convert data to uint32 array
   new_timestamps = list(struct.unpack('I' * int(len(data) / 4), data))
+
+  for x in new_timestamps:
+    if x >= counter_period:
+      print(new_timestamps)
+      exit()
 
   # remove trailing magic value if any
   new_timestamps = [x for x in new_timestamps if x < counter_period]

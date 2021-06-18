@@ -148,7 +148,8 @@ EXTI_HandleTypeDef exti;
 // WS550 fragments udp packets and it seems that these packet
 // cannot be re assembled by client. So we add an header to these
 // fragments : packet id and fragment id
-#define UDP_FRAGMENT_HEADER_SIZE 8
+// !!! header size > 4 will leave 0xFF values in packet after a while
+#define UDP_FRAGMENT_HEADER_SIZE 24
 // #define UDP_FRAGMENT_HEADER_SIZE 0
 #define UDP_FRAGMENT_DATA_SIZE (TIMESTAMP_PER_FRAGMENT * TIMESTAMP_TYPE_SIZE)
 #define UDP_FRAGMENT_SIZE (UDP_FRAGMENT_HEADER_SIZE + UDP_FRAGMENT_DATA_SIZE)
@@ -341,9 +342,8 @@ int main(void)
       UART_Printf(
         "INFO:\r\n"
         "  current_time_ms: %d\r\n"
-        "  UDP_PACKET_SIZE: %d\r\n"
         ,
-        current_time_ms, UDP_PACKET_SIZE
+        current_time_ms
       );
       
       for(uint8_t line=0;line<2;line++) {
@@ -881,7 +881,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     last_packet_time_ms[line] = GetTimerTimeMs();
     packets_sent[line]++;
 
-    // Mark udp_packet
+    // Mark udp_packet to be sure all data is sent
     memset(udp_packet, 0xFF, UDP_PACKET_SIZE);
   }
 }
