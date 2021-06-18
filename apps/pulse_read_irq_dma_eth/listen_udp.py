@@ -14,10 +14,8 @@ sock = socket.socket(socket.AF_INET, # Internet
                      socket.SOCK_DGRAM) # UDP
 sock.bind((UDP_IP, UDP_PORT))
 
-count = 0
-
 # UDP packet sizes
-fragment_header_size = 8
+fragment_header_size = 12
 fragment_data_size = 1000 # 250x4
 
 # UDP packet fragment count
@@ -87,8 +85,6 @@ while True:
     if fragment_id == 0:
       first_fragment_time = time.time()
 
-  count += 1
-
   # compute timings involved
   transfer_end_time = time.time()
   wait_duration = transfer_end_time - wait_duration_start
@@ -96,7 +92,11 @@ while True:
   transfer_duration = transfer_end_time - first_fragment_time
 
   # unpack header content
-  headers = list(struct.unpack('II' * fragment_count, header))
+  headers = list(struct.unpack('III' * fragment_count, header))
+
+  line_id = headers[0]
+  packet_id = headers[1]
+  fragment_id = headers[2]
 
   # convert data to uint32 array
   new_timestamps = list(struct.unpack('{}I'.format(int(len(data) / 4)), data))
@@ -108,7 +108,7 @@ while True:
 
   # print it for information
   print("{}: fragments: {}, waited: {:6.2f}ms, transfer: {:3.0f}us, pulses: {}".format(
-    count, fragment_count, wait_duration*1e3, transfer_duration*1e6, pulses))
+    packet_id, fragment_count, wait_duration*1e3, transfer_duration*1e6, pulses))
 
   # if we waited too long, throw away last timestamps
   if wait_duration > 1/min_rate:

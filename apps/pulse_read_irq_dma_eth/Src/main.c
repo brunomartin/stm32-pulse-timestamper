@@ -149,7 +149,7 @@ EXTI_HandleTypeDef exti;
 // cannot be re assembled by client. So we add an header to these
 // fragments : packet id and fragment id
 // !!! header size > 4 will leave 0xFF values in packet after a while
-#define UDP_FRAGMENT_HEADER_SIZE 8
+#define UDP_FRAGMENT_HEADER_SIZE 12
 // #define UDP_FRAGMENT_HEADER_SIZE 0
 #define UDP_FRAGMENT_DATA_SIZE (TIMESTAMP_PER_FRAGMENT * TIMESTAMP_TYPE_SIZE)
 #define UDP_FRAGMENT_SIZE (UDP_FRAGMENT_HEADER_SIZE + UDP_FRAGMENT_DATA_SIZE)
@@ -199,7 +199,7 @@ static void W5500_Config(void);
 void udp_server_start(uint8_t udp_socket, int server_port, uint8_t* address);
 void udp_server_stop(uint8_t udp_socket);
 
-void WriteBufferHeaders(uint32_t packet_id);
+void WriteBufferHeaders(uint8_t line, uint32_t packet_id);
 
 static void ComputeStats(const uint32_t* timestamps,
   uint32_t size, struct Statistics* stats);
@@ -259,7 +259,7 @@ int main(void)
   memset(udp_packet, 0xFF, UDP_PACKET_SIZE);
 
   // Write packet and fragment ids for first packet to send 
-  WriteBufferHeaders(1);
+  WriteBufferHeaders(0, 1);
   
   /* Configure w5500 */
   W5500_Config();
@@ -726,24 +726,25 @@ static void EXTI_IRQHandler_Config(void)
   * @brief Write headers in buffer to send
   * @retval none
   */
-void WriteBufferHeaders(uint32_t packet_id) {
+void WriteBufferHeaders(uint8_t line, uint32_t packet_id) {
 
   for(uint8_t fragment_id=0;fragment_id<UDP_FRAGMENT_COUNT;fragment_id++) {
     // Point to header part of fragment
     uint8_t* header = udp_packet + fragment_id*UDP_FRAGMENT_SIZE;
+
+    // Write line id as a uint32 and move pointer
+    uint32_t* header_line_id = (uint32_t*)header;
+    *header_line_id = line;
+    header += sizeof(uint32_t);
+
+    // Write packet id as a uint32 and move pointer
     uint32_t* header_packet_id = (uint32_t*)header;
-
-    // Write packet id as a uint32
     *header_packet_id = packet_id;
-    // memset(header, packet_id, sizeof(uint32_t));
+    header += sizeof(uint32_t);
     
-    // Move to write next header data
-    uint32_t* header_fragment_id = (uint8_t*)header + sizeof(uint32_t);
+    // Write fragment id as a uint32
+    uint32_t* header_fragment_id = (uint32_t*)header;
     *header_fragment_id = fragment_id;
-
-    // Write fragment id as a uint8
-    // memset(header, fragment_id, sizeof(uint8_t));
-
   }
 
 }
@@ -920,7 +921,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     memset(udp_packet, 0xFF, UDP_PACKET_SIZE);
 
     // Write packet and fragment ids for next packet to send 
-    WriteBufferHeaders(packets_sent[line] + 1);
+    WriteBufferHeaders(line, packets_sent[line] + 1);
   }
 }
 
