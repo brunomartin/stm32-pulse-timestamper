@@ -179,7 +179,7 @@ while True:
     average, std_dev, min, max, rate*1000))
 
   # print it for information
-  print("{}: waited: {:6.2f}ms, transfer: {:3.0f}us, process:{:3.0f}ms, pulses: {}"
+  print("{}: waited: {:4.1f}ms, transfer: {:3.0f}us, process:{:4.1f}ms, pulses: {}"
     .format(packet_id, wait_duration*1e3, transfer_duration*1e6,
     process_duration*1e3, pulses))
 
