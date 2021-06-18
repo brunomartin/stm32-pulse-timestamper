@@ -105,7 +105,7 @@ while True:
     else:
       print(
         "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n"
-        "% packet_id {} != last_packet_id + 1 {} %\n"
+        "% packet_id ({}) != last_packet_id + 1 ({}) %\n"
         "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n"
         .format(packet_id, last_packet_id + 1))
       exit(-1)
