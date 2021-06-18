@@ -34,7 +34,7 @@ counter_precision = 0.0125 # 80MHz
 min_rate = 10.0
 
 # Tell if we want to compute statistics or not
-compute_stats = True
+compute_stats = False
 
 # UDP packet size
 fragment_size = fragment_header_size + fragment_data_size
@@ -113,22 +113,22 @@ while True:
         .format(packet_id, last_packet_id + 1))
       exit(-1)
 
-  # convert data to uint32 array
-  new_timestamps = list(struct.unpack('{}I'.format(int(len(data) / 4)), data))
-
-  # remove trailing magic value if any
-  new_timestamps = [x for x in new_timestamps if x < counter_period]
-
-  pulses += len(new_timestamps)
-
-  # if we waited too long, throw away last timestamps
-  if wait_duration > 1/min_rate:
-    last_timestamps = []
-    last_packet_id = -1
-
   process_time = time.time()
 
   if compute_stats:
+
+    # convert data to uint32 array
+    new_timestamps = list(struct.unpack('{}I'.format(int(len(data) / 4)), data))
+
+    # remove trailing magic value if any
+    new_timestamps = [x for x in new_timestamps if x < counter_period]
+
+    pulses += len(new_timestamps)
+
+    # if we waited too long, throw away last timestamps
+    if wait_duration > 1/min_rate:
+      last_timestamps = []
+      last_packet_id = -1
 
     # concatenate with last timestamps to ensure continuity
     # if we did not wait too long
