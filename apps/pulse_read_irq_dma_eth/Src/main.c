@@ -149,7 +149,7 @@ EXTI_HandleTypeDef exti;
 // cannot be re assembled by client. So we add an header to these
 // fragments : packet id and fragment id
 // !!! header size > 4 will leave 0xFF values in packet after a while
-#define UDP_FRAGMENT_HEADER_SIZE 24
+#define UDP_FRAGMENT_HEADER_SIZE 8
 // #define UDP_FRAGMENT_HEADER_SIZE 0
 #define UDP_FRAGMENT_DATA_SIZE (TIMESTAMP_PER_FRAGMENT * TIMESTAMP_TYPE_SIZE)
 #define UDP_FRAGMENT_SIZE (UDP_FRAGMENT_HEADER_SIZE + UDP_FRAGMENT_DATA_SIZE)
@@ -198,6 +198,8 @@ static void W5500_Config(void);
 
 void udp_server_start(uint8_t udp_socket, int server_port, uint8_t* address);
 void udp_server_stop(uint8_t udp_socket);
+
+void WriteBufferHeaders(uint32_t packet_id);
 
 static void ComputeStats(const uint32_t* timestamps,
   uint32_t size, struct Statistics* stats);
@@ -253,8 +255,11 @@ int main(void)
   memset(timestamps[0], 0xFF, timestamps_size*TIMESTAMP_TYPE_SIZE);
   memset(timestamps[1], 0xFF, timestamps_size*TIMESTAMP_TYPE_SIZE);
 
-  // Mark udp_packet
+  // Mark to ease detecting errors
   memset(udp_packet, 0xFF, UDP_PACKET_SIZE);
+
+  // Write packet and fragment ids for first packet to send 
+  WriteBufferHeaders(1);
   
   /* Configure w5500 */
   W5500_Config();
@@ -718,6 +723,33 @@ static void EXTI_IRQHandler_Config(void)
 }
 
 /**
+  * @brief Write headers in buffer to send
+  * @retval none
+  */
+void WriteBufferHeaders(uint32_t packet_id) {
+
+  for(uint8_t fragment_id=0;fragment_id<UDP_FRAGMENT_COUNT;fragment_id++) {
+    // Point to header part of fragment
+    uint8_t* header = udp_packet + fragment_id*UDP_FRAGMENT_SIZE;
+    uint32_t* header_packet_id = (uint32_t*)header;
+
+    // Write packet id as a uint32
+    *header_packet_id = packet_id;
+    // memset(header, packet_id, sizeof(uint32_t));
+    
+    // Move to write next header data
+    uint32_t* header_fragment_id = (uint8_t*)header + sizeof(uint32_t);
+    *header_fragment_id = fragment_id;
+
+    // Write fragment id as a uint8
+    // memset(header, fragment_id, sizeof(uint8_t));
+
+  }
+
+}
+
+
+/**
   * @brief Copy timestamp content to UDP packet
   * @param udp_packet_index: index in byte of the UDP packet location to fill
   * @param line: timestamp line to copy from
@@ -729,7 +761,7 @@ uint16_t CopyTimestampsToBuffer(uint16_t udp_packet_index, uint8_t line,
   uint32_t timestamp_index, uint32_t count) {
 
   if(count*TIMESTAMP_TYPE_SIZE > UDP_PACKET_DATA_SIZE) {
-    UART_Printf("Too much data to send !!!\r\n");
+    UART_Printf("Too much data to send, that should never happen !!!\r\n");
     Error_Handler();
   }
 
@@ -743,7 +775,7 @@ uint16_t CopyTimestampsToBuffer(uint16_t udp_packet_index, uint8_t line,
   }
 
   if(udp_packet_index + count*TIMESTAMP_TYPE_SIZE > UDP_PACKET_SIZE) {
-    UART_Printf("Trying to right out of UDP packet !!!\r\n");
+    UART_Printf("Trying to right out of UDP packet, that should never happen !!!\r\n");
     Error_Handler();
   }
 
@@ -830,6 +862,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
     // If there is no pulse to send then return
     if(pulses_to_sent == 0) {
+      UART_Printf("Trying to send zero pulse, that should never happen !!!\r\n");
+      Error_Handler();
       return;
     }
 
@@ -882,8 +916,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     last_packet_time_ms[line] = GetTimerTimeMs();
     packets_sent[line]++;
 
-    // Mark udp_packet to be sure all data is sent
+    // Mark to ease detecting errors
     memset(udp_packet, 0xFF, UDP_PACKET_SIZE);
+
+    // Write packet and fragment ids for next packet to send 
+    WriteBufferHeaders(packets_sent[line] + 1);
   }
 }
 

@@ -17,7 +17,7 @@ sock.bind((UDP_IP, UDP_PORT))
 count = 0
 
 # UDP packet sizes
-fragment_header_size = 24
+fragment_header_size = 8
 fragment_data_size = 1000 # 250x4
 
 # UDP packet fragment count
@@ -46,6 +46,8 @@ fragment = bytearray(fragment_size)
 header = bytearray(header_size)
 data = bytearray(data_size)
 
+headers = []
+
 timestamps = []
 new_timestamps = []
 last_timestamps = []
@@ -72,10 +74,15 @@ while True:
       header_end = header_start + fragment_header_size
       header[header_start:header_end] = fragment[:fragment_header_size]
 
+      # packet_id, real_fragment_id = struct.unpack('IB', fragment[:fragment_header_size])
+
+      # print("{}, {}".format(packet_id, real_fragment_id))
+
     # extract data from fragment
     data_start = fragment_id * fragment_data_size
     data_end = data_start + fragment_data_size
     data[data_start:data_end] = fragment[fragment_header_size:]
+
 
     if fragment_id == 0:
       first_fragment_time = time.time()
@@ -88,13 +95,11 @@ while True:
   wait_duration_start = transfer_end_time
   transfer_duration = transfer_end_time - first_fragment_time
 
-  # convert data to uint32 array
-  new_timestamps = list(struct.unpack('I' * int(len(data) / 4), data))
+  # unpack header content
+  headers = list(struct.unpack('II' * fragment_count, header))
 
-  for x in new_timestamps:
-    if x >= counter_period:
-      print(new_timestamps)
-      exit()
+  # convert data to uint32 array
+  new_timestamps = list(struct.unpack('{}I'.format(int(len(data) / 4)), data))
 
   # remove trailing magic value if any
   new_timestamps = [x for x in new_timestamps if x < counter_period]
