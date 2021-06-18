@@ -16,8 +16,9 @@ sock.bind((UDP_IP, UDP_PORT))
 
 count = 0
 
-# UDP packet fragment size
-fragment_size = 1024
+# UDP packet sizes
+fragment_header_size = 8
+fragment_data_size = 1016
 
 # UDP packet fragment count
 fragment_count = 4
@@ -35,10 +36,15 @@ counter_precision = 0.0125 # 80MHz
 min_rate = 10.0
 
 # UDP packet size
+fragment_size = fragment_header_size + fragment_data_size
 packet_size = fragment_count*fragment_size
+header_size = fragment_count*fragment_header_size
+data_size = fragment_count*fragment_data_size
 
 # initialize arrays to store UDP fragments
-data = bytearray(packet_size)
+fragment = bytearray(fragment_size)
+header = bytearray(header_size)
+data = bytearray(data_size)
 
 timestamps = []
 new_timestamps = []
@@ -55,14 +61,23 @@ pulses = 0
 
 while True:
 
-  for fragment in range(0, fragment_count):
+  for fragment_id in range(0, fragment_count):
 
-    data_start = fragment * fragment_size
-    data_end = data_start + fragment_size
+    # Receive and store whole fragment
+    fragment, addr = sock.recvfrom(fragment_size)
 
-    data[data_start:data_end], addr = sock.recvfrom(fragment_size)
+    # extract header from fragment
+    if header_size > 0:
+      header_start = fragment_id * fragment_header_size
+      header_end = header_start + fragment_header_size
+      header[header_start:header_end] = fragment[:fragment_header_size]
 
-    if fragment == 0:
+    # extract data from fragment
+    data_start = fragment_id * fragment_data_size
+    data_end = data_start + fragment_data_size
+    data[data_start:data_end] = fragment[fragment_header_size:]
+
+    if fragment_id == 0:
       first_fragment_time = time.time()
 
   count += 1

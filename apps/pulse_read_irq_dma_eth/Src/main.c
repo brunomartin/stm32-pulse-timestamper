@@ -130,11 +130,16 @@ uint8_t address[4] = { 192, 168, 1, 12 };
 
 EXTI_HandleTypeDef exti;
 
+// Buffer of W5500 is 4kB, 4x1024B
+// Each fragment shall contain header + data
+// 1024B per fragment, 4 fragments per packet is ok for robustess
+// Total shall not exceed 4KB unless end of data is lost
+
 // UDP packet fragment size in bytes, MSS is set
 // to this value, max is 1472 bytes
-// header : packet id + fragment id : 4 + 2 bytes
-// content : 1024 bytes: 256 uint32 timestamps values
-#define TIMESTAMP_PER_FRAGMENT 256
+// header : packet id + fragment id : 4 + 4 bytes
+// content : 1016 bytes: 254 uint32 timestamps values
+#define TIMESTAMP_PER_FRAGMENT 254
 
 // timestamp type size in bytes, according to chosen Timer
 // It can be uin16 or uint32, TIM2 is uint32
@@ -143,8 +148,8 @@ EXTI_HandleTypeDef exti;
 // WS550 fragments udp packets and it seems that these packet
 // cannot be re assembled by client. So we add an header to these
 // fragments : packet id and fragment id
-// #define UDP_FRAGMENT_HEADER_SIZE 4 + 2
-#define UDP_FRAGMENT_HEADER_SIZE 0
+#define UDP_FRAGMENT_HEADER_SIZE 8
+// #define UDP_FRAGMENT_HEADER_SIZE 0
 #define UDP_FRAGMENT_DATA_SIZE (TIMESTAMP_PER_FRAGMENT * TIMESTAMP_TYPE_SIZE)
 #define UDP_FRAGMENT_SIZE (UDP_FRAGMENT_HEADER_SIZE + UDP_FRAGMENT_DATA_SIZE)
 
@@ -336,8 +341,9 @@ int main(void)
       UART_Printf(
         "INFO:\r\n"
         "  current_time_ms: %d\r\n"
+        "  UDP_PACKET_SIZE: %d\r\n"
         ,
-        current_time_ms
+        current_time_ms, UDP_PACKET_SIZE
       );
       
       for(uint8_t line=0;line<2;line++) {
@@ -1204,8 +1210,8 @@ void udp_server_start(uint8_t udp_socket, int server_port, uint8_t* address) {
   // | packet id | fragment number | timestamps         |
   // | 4 bytes   | 2 bytes         | 256x4 = 1024 bytes |
   // 
-  uint16_t value = 1024;
-  // uint16_t value = UDP_FRAGMENT_SIZE;
+  // uint16_t value = 1024;
+  uint16_t value = UDP_FRAGMENT_SIZE;
   
   setsockopt(udp_socket, SO_MSS, &value);
 
