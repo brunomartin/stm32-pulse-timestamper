@@ -137,7 +137,7 @@ EXTI_HandleTypeDef exti;
 
 // UDP packet fragment size in bytes, MSS is set
 // to this value, max is 1472 bytes
-// header : packet id + fragment id : 4 + 2 bytes
+// header : line id + packet id + fragment id : 4 + 4 + 4 = 12 bytes
 // content : 1016 bytes: 250 uint32 timestamps values
 #define TIMESTAMP_PER_FRAGMENT 250
 
@@ -148,9 +148,7 @@ EXTI_HandleTypeDef exti;
 // WS550 fragments udp packets and it seems that these packet
 // cannot be re assembled by client. So we add an header to these
 // fragments : packet id and fragment id
-// !!! header size > 4 will leave 0xFF values in packet after a while
 #define UDP_FRAGMENT_HEADER_SIZE 12
-// #define UDP_FRAGMENT_HEADER_SIZE 0
 #define UDP_FRAGMENT_DATA_SIZE (TIMESTAMP_PER_FRAGMENT * TIMESTAMP_TYPE_SIZE)
 #define UDP_FRAGMENT_SIZE (UDP_FRAGMENT_HEADER_SIZE + UDP_FRAGMENT_DATA_SIZE)
 
