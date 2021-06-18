@@ -125,7 +125,7 @@ __IO uint32_t last_packet_time_ms[2] = {-1, -1};
 // send timestamps when { 255, 255, 255, 255 }, it waits
 // for client connection
 // uint8_t address[4] = { 255, 255, 255, 255 };
-uint8_t address[4] = { 192, 168, 1, 15 };
+uint8_t address[4] = { 192, 168, 1, 12 };
 // uint8_t address[4] = { 192, 168, 1, 40 };
 
 EXTI_HandleTypeDef exti;
@@ -273,8 +273,10 @@ int main(void)
   uint32_t current_time_ms = GetTimerTimeMs();
   uint32_t last_print_time_ms = current_time_ms;
 
-  UART_Printf("Filling RAM and Tx buffer...\n\r");
-  for(int i=0;i<4;i++) {
+  UART_Printf("Filling RAM and UDP Tx buffer...\n\r");
+  // If we do not do that, first timestamps will take too much
+  // time and add a lot of jitter
+  for(int i=0;i<2;i++) {
     int32_t nbytes = sendto(udp_socket, udp_packet, UDP_PACKET_SIZE, address, 65535);
   }
 
@@ -327,7 +329,7 @@ int main(void)
     }
 
     uint32_t duration = (current_time_ms - last_print_time_ms);
-    if(duration > 2000) {
+    if(duration > 5000) {
       UART_Printf(
         "INFO:\r\n"
         "  current_time_ms: %d\r\n"
