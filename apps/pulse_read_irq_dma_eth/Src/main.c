@@ -723,7 +723,7 @@ static void EXTI_IRQHandler_Config(void)
   */
 void WriteBufferHeaders(uint8_t line, uint32_t packet_id) {
 
-  for(uint8_t fragment_id=0;fragment_id<UDP_FRAGMENT_COUNT;fragment_id++) {
+  for(uint32_t fragment_id=0;fragment_id<UDP_FRAGMENT_COUNT;fragment_id++) {
     // Point to header part of fragment
     uint8_t* header = udp_packet + fragment_id*UDP_FRAGMENT_SIZE;
 

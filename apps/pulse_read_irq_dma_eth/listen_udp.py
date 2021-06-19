@@ -103,15 +103,15 @@ while True:
   if last_packet_id == -1:
     last_packet_id = packet_id
   else:
-    if packet_id == last_packet_id + 1:
-      last_packet_id = packet_id
-    else:
+    if packet_id != last_packet_id + 1:
       print(
         "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n"
         "% packet_id ({}) != last_packet_id + 1 ({}) %\n"
         "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n"
         .format(packet_id, last_packet_id + 1))
       exit(-1)
+
+    last_packet_id = packet_id
 
   process_time = time.time()
 
