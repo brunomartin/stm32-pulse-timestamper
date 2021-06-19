@@ -138,9 +138,9 @@
 
 #define EXTIx_IRQHandler               EXTI15_10_IRQHandler
 #define EXTIx_IRQn                     EXTI15_10_IRQn
-#define EXTIx_0_CLK_ENABLE()            __HAL_RCC_GPIOB_CLK_ENABLE()
+#define EXTIx_0_CLK_ENABLE()            __HAL_RCC_GPIOC_CLK_ENABLE()
 #define EXTIx_0_PIN                    GPIO_PIN_10
-#define EXTIx_0_GPIO_PORT              GPIOB
+#define EXTIx_0_GPIO_PORT              GPIOC
 #define EXTIx_1_CLK_ENABLE()            __HAL_RCC_GPIOC_CLK_ENABLE()
 #define EXTIx_1_PIN                    GPIO_PIN_11
 #define EXTIx_1_GPIO_PORT              GPIOC

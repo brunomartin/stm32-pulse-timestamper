@@ -99,11 +99,19 @@ while True:
   packet_id = headers[1]
   fragment_id = headers[2]
 
+  process_time = time.time()
+
+  # convert data to uint32 array
+  new_timestamps = list(struct.unpack('{}I'.format(int(len(data) / 4)), data))
+
   # Detect discontinuation in packet ids
   if last_packet_id == -1:
     last_packet_id = packet_id
   else:
     if packet_id != last_packet_id + 1:
+      print(fragment)
+      print(headers)
+      print(new_timestamps)
       print(
         "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n"
         "% packet_id ({}) != last_packet_id + 1 ({}) %\n"
@@ -112,11 +120,6 @@ while True:
       exit(-1)
 
     last_packet_id = packet_id
-
-  process_time = time.time()
-
-  # convert data to uint32 array
-  new_timestamps = list(struct.unpack('{}I'.format(int(len(data) / 4)), data))
 
   # remove trailing magic value if any
   new_timestamps = [x for x in new_timestamps if x < counter_period]
