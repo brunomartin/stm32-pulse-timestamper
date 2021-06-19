@@ -895,7 +895,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     pulses_sent[line] += pulses_to_sent;
 
     // Write line, packet and fragment ids for packet to send 
-    WriteBufferHeaders(0, packets_sent[line] + 1);
+    WriteBufferHeaders(line, packets_sent[line] + 1);
 
     // Mark transfer as finished
     buffering_timestamps = 0;
