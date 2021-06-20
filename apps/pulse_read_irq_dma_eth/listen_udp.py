@@ -36,7 +36,7 @@ counter_precision = 0.0125 # 80MHz
 min_rate = 10.0
 
 # Tell if concatenate timestamp to be sure packet are contiguous
-concatenate_timestamps = True
+concatenate_packets = True
 
 # Tell if we want to compute statistics or not
 compute_stats = False
@@ -53,8 +53,8 @@ header = bytearray(header_size)
 data = bytearray(data_size)
 
 # initialize lists for each line
-# headers = []
 timestamps = []
+last_headers = []
 last_timestamps = []
 
 last_packet_id = []
@@ -65,6 +65,7 @@ first_fragment_time = []
 pulses = []
 
 for i in range(lines):
+  last_headers.append([])
   last_timestamps.append([])
   last_packet_id.append(-1)
   wait_duration_start.append(time.time())
@@ -92,11 +93,11 @@ while True:
       first_fragment_time = time.time()
 
   # unpack header content : line, packet_id, fragment_id
-  headers = list(struct.unpack('III' * fragment_count, header))
+  new_headers = list(struct.unpack('III' * fragment_count, header))
 
-  line = headers[0]
-  packet_id = headers[1]
-  fragment_id = headers[2]
+  line = new_headers[0]
+  packet_id = new_headers[1]
+  fragment_id = new_headers[2]
 
   # compute timings involved
   transfer_end_time = time.time()
@@ -106,6 +107,7 @@ while True:
 
   # if we waited too long, throw away last timestamps
   if wait_duration > 1/min_rate:
+    last_headers[line] = []
     last_timestamps[line] = []
     last_packet_id[line] = -1
     wait_duration = 0
@@ -121,7 +123,7 @@ while True:
   else:
     if packet_id != last_packet_id[line] + 1:
       print(fragment)
-      print(headers)
+      print(new_headers)
       print(new_timestamps)
       print(
         "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n"
@@ -142,10 +144,14 @@ while True:
 
     # concatenate with last timestamps to ensure continuity
     # if we did not wait too long
-    if concatenate_timestamps:
+    if concatenate_packets:
+      headers = last_headers[line] + new_headers
+      last_headers[line] = new_headers
+
       timestamps = last_timestamps[line] + new_timestamps
       last_timestamps[line] = new_timestamps
     else:
+      headers = new_headers
       timestamps = new_timestamps
 
     # unwrap timestamps according to counter period
