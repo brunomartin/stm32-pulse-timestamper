@@ -82,7 +82,6 @@ while True:
     data_end = data_start + fragment_data_size
     data[data_start:data_end] = fragment[fragment_header_size:]
 
-
     if fragment_id == 0:
       first_fragment_time = time.time()
 
@@ -91,6 +90,11 @@ while True:
   wait_duration = transfer_end_time - wait_duration_start
   wait_duration_start = transfer_end_time
   transfer_duration = transfer_end_time - first_fragment_time
+
+  # if we waited too long, throw away last timestamps
+  if wait_duration > 1/min_rate:
+    last_timestamps = []
+    last_packet_id = -1
 
   # unpack header content : line_id, packet_id, fragment_id
   headers = list(struct.unpack('III' * fragment_count, header))
@@ -128,11 +132,6 @@ while True:
   pulses += len(new_timestamps)
 
   if compute_stats:
-
-    # if we waited too long, throw away last timestamps
-    if wait_duration > 1/min_rate:
-      last_timestamps = []
-      last_packet_id = -1
 
     # concatenate with last timestamps to ensure continuity
     # if we did not wait too long
@@ -197,6 +196,6 @@ while True:
       average, std_dev, min, max, rate*1000))
 
   # print it for information
-  print("{}: waited: {:4.1f}ms, transfer: {:3.0f}us, process:{:4.1f}ms, pulses: {}"
-    .format(packet_id, wait_duration*1e3, transfer_duration*1e6,
+  print("{}/{}: waited: {:4.1f}ms, transfer: {:3.0f}us, process:{:4.1f}ms, pulses: {}"
+    .format(line_id, packet_id, wait_duration*1e3, transfer_duration*1e6,
     process_duration*1e3, pulses))

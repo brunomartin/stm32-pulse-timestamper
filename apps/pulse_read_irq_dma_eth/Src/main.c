@@ -111,7 +111,7 @@ uint32_t* timestamps[2] = {0, 0};
 __IO uint32_t pulses_sent[2] = {0, 0};
 
 uint8_t udp_socket = UDP_SOCKET;
-int dest_ports[2] = {8042, 8043};
+int dest_ports[2] = {8042, 8042};
 
 // buffering_timestamps tells that trabufferingnsfer is occuring
 // avoiding sending same timestamps twice 
@@ -313,7 +313,7 @@ int main(void)
       if(current_pulses_detected > 0) {
         uint32_t index = (current_pulses_detected-1)%timestamps_size;
         last_detected_pulse_time_ms = GetTimerTimeUsFromCounter(
-          timestamps[0][index]) / 1000;
+          timestamps[line][index]) / 1000;
       }
 
       uint32_t pulses_to_sent = 0;
