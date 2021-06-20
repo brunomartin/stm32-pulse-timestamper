@@ -36,10 +36,10 @@ counter_precision = 0.0125 # 80MHz
 min_rate = 10.0
 
 # Tell if concatenate timestamp to be sure packet are contiguous
-concatenate_packets = True
+concatenate_timestamps = True
 
 # Tell if we want to compute statistics or not
-compute_stats = False
+compute_stats = True
 
 # UDP packet size
 fragment_size = fragment_header_size + fragment_data_size
@@ -53,8 +53,8 @@ header = bytearray(header_size)
 data = bytearray(data_size)
 
 # initialize lists for each line
+# headers = []
 timestamps = []
-last_headers = []
 last_timestamps = []
 
 last_packet_id = []
@@ -65,7 +65,6 @@ first_fragment_time = []
 pulses = []
 
 for i in range(lines):
-  last_headers.append([])
   last_timestamps.append([])
   last_packet_id.append(-1)
   wait_duration_start.append(time.time())
@@ -93,11 +92,11 @@ while True:
       first_fragment_time = time.time()
 
   # unpack header content : line, packet_id, fragment_id
-  new_headers = list(struct.unpack('III' * fragment_count, header))
+  headers = list(struct.unpack('III' * fragment_count, header))
 
-  line = new_headers[0]
-  packet_id = new_headers[1]
-  fragment_id = new_headers[2]
+  line = headers[0]
+  packet_id = headers[1]
+  fragment_id = headers[2]
 
   # compute timings involved
   transfer_end_time = time.time()
@@ -107,7 +106,6 @@ while True:
 
   # if we waited too long, throw away last timestamps
   if wait_duration > 1/min_rate:
-    last_headers[line] = []
     last_timestamps[line] = []
     last_packet_id[line] = -1
     wait_duration = 0
@@ -123,7 +121,7 @@ while True:
   else:
     if packet_id != last_packet_id[line] + 1:
       print(fragment)
-      print(new_headers)
+      print(headers)
       print(new_timestamps)
       print(
         "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n"
@@ -144,14 +142,10 @@ while True:
 
     # concatenate with last timestamps to ensure continuity
     # if we did not wait too long
-    if concatenate_packets:
-      headers = last_headers[line] + new_headers
-      last_headers[line] = new_headers
-
+    if concatenate_timestamps:
       timestamps = last_timestamps[line] + new_timestamps
       last_timestamps[line] = new_timestamps
     else:
-      headers = new_headers
       timestamps = new_timestamps
 
     # unwrap timestamps according to counter period
@@ -172,21 +166,26 @@ while True:
     # apply conversion according to precision
     durations = [duration*counter_precision for duration in durations]
 
-    # compute statistics
-    average = 0
-    min = durations[0]
-    max = durations[0]
-    for duration in durations:
-      average += duration
-      min = duration if duration < min else min
-      max = duration if duration > max else max
-    average /= len(durations)
+    def compute_statistics(values):
+      average = 0
+      min = durations[0]
+      max = durations[0]
+      for duration in durations:
+        average += duration
+        min = duration if duration < min else min
+        max = duration if duration > max else max
+      average /= len(durations)
 
-    std_dev = 0
-    for duration in durations:
-      std_dev += (duration - average)**2
-    std_dev /= len(durations)
-    std_dev = math.sqrt(std_dev)
+      std_dev = 0
+      for duration in durations:
+        std_dev += (duration - average)**2
+      std_dev /= len(durations)
+      std_dev = math.sqrt(std_dev)
+
+      return average, std_dev, min, max
+
+    # compute statistics
+    average, std_dev, min, max = compute_statistics(durations)
 
     rate = math.nan
     if average != 0:
@@ -200,6 +199,14 @@ while True:
         )
       exit(-1)
 
+    if lines > 1 and line == 1:
+      # compute delay between line 1 pulse and line 0 pulse
+      delays = [(last_timestamps[1][i] - last_timestamps[0][i]) for
+        i in range(len(last_timestamps))]
+
+      delay_average, delay_std_dev, delay_min, delay_max = compute_statistics(durations)
+
+
   process_duration = time.time() - process_time
 
   # print statistics if we computed them
@@ -207,6 +214,11 @@ while True:
     print("  average: {:.2f}us, dev: {:5.2f}us, min: {:5.2f}us,"
       " max: {:5.2f}us, rate: {:.2f}kHz".format(
       average, std_dev, min, max, rate*1000))
+
+    if lines > 1 and line == 1:
+      print("  delay: average: {:.2f}us, dev: {:5.2f}us, min: {:5.2f}us,"
+        " max: {:5.2f}us".format(
+        delay_average, delay_std_dev, delay_min, delay_max))
 
   # print it for information
   print("{}/{}: waited: {:4.1f}ms, transfer: {:3.0f}us, process:{:4.1f}ms, pulses: {}"
