@@ -95,6 +95,7 @@ while True:
   if wait_duration > 1/min_rate:
     last_timestamps = []
     last_packet_id = -1
+    wait_duration = 0
 
   # unpack header content : line_id, packet_id, fragment_id
   headers = list(struct.unpack('III' * fragment_count, header))
