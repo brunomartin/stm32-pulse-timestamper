@@ -168,18 +168,18 @@ while True:
 
     def compute_statistics(values):
       average = 0
-      min = durations[0]
-      max = durations[0]
-      for duration in durations:
-        average += duration
-        min = duration if duration < min else min
-        max = duration if duration > max else max
-      average /= len(durations)
+      min = values[0]
+      max = values[0]
+      for value in values:
+        average += value
+        min = value if value < min else min
+        max = value if value > max else max
+      average /= len(values)
 
       std_dev = 0
-      for duration in durations:
+      for duration in values:
         std_dev += (duration - average)**2
-      std_dev /= len(durations)
+      std_dev /= len(values)
       std_dev = math.sqrt(std_dev)
 
       return average, std_dev, min, max
@@ -199,12 +199,17 @@ while True:
         )
       exit(-1)
 
-    if lines > 1 and line == 1:
+    compute_delay = lines > 1 and line == 1
+    compute_delay &= len(last_timestamps[line]) > 0
+    compute_delay &= len(last_timestamps[line]) > 0
+
+    if (lines > 1 and len(last_timestamps[0]) > 0
+      and len(last_timestamps[1]) > 0 and line == 1):
       # compute delay between line 1 pulse and line 0 pulse
       delays = [(last_timestamps[1][i] - last_timestamps[0][i]) for
         i in range(len(last_timestamps))]
 
-      delay_average, delay_std_dev, delay_min, delay_max = compute_statistics(durations)
+      delay_average, delay_std_dev, delay_min, delay_max = compute_statistics(delays)
 
 
   process_duration = time.time() - process_time
@@ -215,7 +220,8 @@ while True:
       " max: {:5.2f}us, rate: {:.2f}kHz".format(
       average, std_dev, min, max, rate*1000))
 
-    if lines > 1 and line == 1:
+    if (lines > 1 and len(last_timestamps[0]) > 0
+      and len(last_timestamps[1]) > 0 and line == 1):
       print("  delay: average: {:.2f}us, dev: {:5.2f}us, min: {:5.2f}us,"
         " max: {:5.2f}us".format(
         delay_average, delay_std_dev, delay_min, delay_max))
