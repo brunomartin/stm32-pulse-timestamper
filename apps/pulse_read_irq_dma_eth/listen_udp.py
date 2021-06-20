@@ -10,6 +10,8 @@ import math
 UDP_IP = ""
 UDP_PORT = 8042
 
+lines = 2
+
 sock = socket.socket(socket.AF_INET, # Internet
                      socket.SOCK_DGRAM) # UDP
 sock.bind((UDP_IP, UDP_PORT))
@@ -33,6 +35,9 @@ counter_precision = 0.0125 # 80MHz
 # timestamp analysis is reset
 min_rate = 10.0
 
+# Tell if concatenate timestamp to be sure packet are contiguous
+concatenate_timestamps = True
+
 # Tell if we want to compute statistics or not
 compute_stats = False
 
@@ -47,22 +52,23 @@ fragment = bytearray(fragment_size)
 header = bytearray(header_size)
 data = bytearray(data_size)
 
-headers = []
-
+# initialize lists for each line
+# headers = []
 timestamps = []
-new_timestamps = []
 last_timestamps = []
 
-last_packet_id = -1
+last_packet_id = []
 
-concatenat_timestamps = True
+wait_duration_start = []
+first_fragment_time = []
 
-durations = []
+pulses = []
 
-wait_duration_start = time.time()
-first_fragment_time = time.time()
-
-pulses = 0
+for i in range(lines):
+  last_timestamps.append([])
+  last_packet_id.append(-1)
+  wait_duration_start.append(time.time())
+  pulses.append(0)
 
 while True:
 
@@ -85,24 +91,24 @@ while True:
     if fragment_id == 0:
       first_fragment_time = time.time()
 
+  # unpack header content : line, packet_id, fragment_id
+  headers = list(struct.unpack('III' * fragment_count, header))
+
+  line = headers[0]
+  packet_id = headers[1]
+  fragment_id = headers[2]
+
   # compute timings involved
   transfer_end_time = time.time()
-  wait_duration = transfer_end_time - wait_duration_start
-  wait_duration_start = transfer_end_time
+  wait_duration = transfer_end_time - wait_duration_start[line]
+  wait_duration_start[line] = transfer_end_time
   transfer_duration = transfer_end_time - first_fragment_time
 
   # if we waited too long, throw away last timestamps
   if wait_duration > 1/min_rate:
-    last_timestamps = []
-    last_packet_id = -1
+    last_timestamps[line] = []
+    last_packet_id[line] = -1
     wait_duration = 0
-
-  # unpack header content : line_id, packet_id, fragment_id
-  headers = list(struct.unpack('III' * fragment_count, header))
-
-  line_id = headers[0]
-  packet_id = headers[1]
-  fragment_id = headers[2]
 
   process_time = time.time()
 
@@ -110,10 +116,10 @@ while True:
   new_timestamps = list(struct.unpack('{}I'.format(int(len(data) / 4)), data))
 
   # Detect discontinuation in packet ids
-  if last_packet_id == -1:
-    last_packet_id = packet_id
+  if last_packet_id[line] == -1:
+    last_packet_id[line] = packet_id
   else:
-    if packet_id != last_packet_id + 1:
+    if packet_id != last_packet_id[line] + 1:
       print(fragment)
       print(headers)
       print(new_timestamps)
@@ -124,21 +130,21 @@ while True:
         .format(packet_id, last_packet_id + 1))
       exit(-1)
 
-    last_packet_id = packet_id
+    last_packet_id[line] = packet_id
 
   # remove trailing magic value if any
   new_timestamps = [x for x in new_timestamps if x < counter_period]
 
   # Increment total number of pulses from script start
-  pulses += len(new_timestamps)
+  pulses[line] += len(new_timestamps)
 
   if compute_stats:
 
     # concatenate with last timestamps to ensure continuity
     # if we did not wait too long
-    if concatenat_timestamps:
-      timestamps = last_timestamps + new_timestamps
-      last_timestamps = new_timestamps
+    if concatenate_timestamps:
+      timestamps = last_timestamps[line] + new_timestamps
+      last_timestamps[line] = new_timestamps
     else:
       timestamps = new_timestamps
 
@@ -158,7 +164,7 @@ while True:
     durations = [(timestamps[i] - timestamps[i-1]) for i in range(1, len(timestamps)-1)]
 
     # apply conversion according to precision
-    durations = [ duration*counter_precision for duration in durations]
+    durations = [duration*counter_precision for duration in durations]
 
     # compute statistics
     average = 0
@@ -198,5 +204,5 @@ while True:
 
   # print it for information
   print("{}/{}: waited: {:4.1f}ms, transfer: {:3.0f}us, process:{:4.1f}ms, pulses: {}"
-    .format(line_id, packet_id, wait_duration*1e3, transfer_duration*1e6,
-    process_duration*1e3, pulses))
+    .format(line, packet_id, wait_duration*1e3, transfer_duration*1e6,
+    process_duration*1e3, pulses[line]))
