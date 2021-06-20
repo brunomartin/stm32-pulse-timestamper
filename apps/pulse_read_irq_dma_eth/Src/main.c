@@ -332,7 +332,7 @@ int main(void)
         // Tell that transfer is occuring unless it may reentre here
         buffering_timestamps = 1;
 
-        exti.Line = EXTI_LINE_9;
+        exti.Line = line == 0 ? SWIx_0_LINE : SWIx_1_LINE;
         HAL_EXTI_GenerateSWI(&exti);
       }
     }
@@ -836,7 +836,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
       // Tell that transfer is occuring unless it may reentre here
       buffering_timestamps = 1;
 
-      exti.Line = EXTI_LINE_9;
+      exti.Line = line == 0 ? SWIx_0_LINE : SWIx_1_LINE;
       HAL_EXTI_GenerateSWI(&exti);
     }
 
