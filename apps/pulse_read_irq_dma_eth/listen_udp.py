@@ -104,10 +104,10 @@ while True:
   wait_duration_start[line] = transfer_end_time
   transfer_duration = transfer_end_time - first_fragment_time
 
-  # if we waited too long, throw away last timestamps
+  # if we waited too long, throw away last timestamps for all lines
   if wait_duration > 1/min_rate:
-    last_timestamps[line] = []
-    last_packet_id[line] = -1
+    last_timestamps[0:lines] = [[] for i in range(lines)]
+    last_packet_id[0:lines] = [-1 for i in range(lines)]
     wait_duration = 0
 
   process_time = time.time()
