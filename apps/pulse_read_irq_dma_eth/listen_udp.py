@@ -39,7 +39,10 @@ min_rate = 10.0
 concatenate_timestamps = True
 
 # Tell if we want to compute statistics or not
-compute_stats = True
+compute_stats = False
+
+# Tell if we record timetamps
+record_timetamps = True
 
 # UDP packet size
 fragment_size = fragment_header_size + fragment_data_size
@@ -114,6 +117,15 @@ while True:
 
   # convert data to uint32 array
   new_timestamps = list(struct.unpack('{}I'.format(int(len(data) / 4)), data))
+
+  record_time = time.time()
+
+  if record_timetamps:
+    with open("timestamps_" + str(line) + ".txt", "a") as file:
+      for timestamp in new_timestamps:
+        file.write(str(timestamp) + "\n")
+
+  record_duration = time.time() - record_time
 
   # Detect discontinuation in packet ids
   if last_packet_id[line] == -1:
@@ -199,18 +211,16 @@ while True:
         )
       exit(-1)
 
-    compute_delay = lines > 1 and line == 1
-    compute_delay &= len(last_timestamps[line]) > 0
-    compute_delay &= len(last_timestamps[line]) > 0
+    compute_delay = (lines > 1) and (line == 1)
+    for i in range(lines):
+      compute_delay &= len(last_timestamps[i]) > 0
 
-    if (lines > 1 and len(last_timestamps[0]) > 0
-      and len(last_timestamps[1]) > 0 and line == 1):
+    if compute_delay:
       # compute delay between line 1 pulse and line 0 pulse
       delays = [(last_timestamps[1][i] - last_timestamps[0][i]) for
         i in range(len(last_timestamps))]
 
       delay_average, delay_std_dev, delay_min, delay_max = compute_statistics(delays)
-
 
   process_duration = time.time() - process_time
 
@@ -220,13 +230,21 @@ while True:
       " max: {:5.2f}us, rate: {:.2f}kHz".format(
       average, std_dev, min, max, rate*1000))
 
-    if (lines > 1 and len(last_timestamps[0]) > 0
-      and len(last_timestamps[1]) > 0 and line == 1):
+    if compute_delay:
       print("  delay: average: {:.2f}us, dev: {:5.2f}us, min: {:5.2f}us,"
         " max: {:5.2f}us".format(
         delay_average, delay_std_dev, delay_min, delay_max))
 
+  else:
+    average = new_timestamps[-1] - new_timestamps[0]
+    average /= len(new_timestamps) - 1
+    average *= counter_precision
+    rate = 1/average if average != 0 else math.nan
+    print("  average: {:.2f}us, rate: {:.2f}kHz".format(
+      average, rate*1000))
+
+
   # print it for information
-  print("{}/{}: waited: {:4.1f}ms, transfer: {:3.0f}us, process:{:4.1f}ms, pulses: {}"
+  print("{}/{}: waited: {:4.1f}ms, Tx: {:3.0f}us, proc: {:4.1f}ms, rec: {:4.1f}ms, pulses: {}"
     .format(line, packet_id, wait_duration*1e3, transfer_duration*1e6,
-    process_duration*1e3, pulses[line]))
+     process_duration*1e3, record_duration*1e3, pulses[line]))

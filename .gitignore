@@ -20,3 +20,6 @@ docs/html
 
 # MacOS files
 ._*
+
+# generated files
+timestamps_*.txt
