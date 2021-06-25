@@ -39,10 +39,10 @@ min_rate = 10.0
 concatenate_timestamps = True
 
 # Tell if we want to compute statistics or not
-compute_stats = False
+compute_stats = True
 
 # Tell if we record timetamps
-record_timetamps = True
+record_timetamps = False
 
 # UDP packet size
 fragment_size = fragment_header_size + fragment_data_size
@@ -219,6 +219,8 @@ while True:
       # compute delay between line 1 pulse and line 0 pulse
       delays = [(last_timestamps[1][i] - last_timestamps[0][i]) for
         i in range(len(last_timestamps))]
+
+      delays = [delay*counter_precision for delay in delays]
 
       delay_average, delay_std_dev, delay_min, delay_max = compute_statistics(delays)
 
