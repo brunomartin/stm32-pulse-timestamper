@@ -33,16 +33,18 @@ counter_precision = 0.0125 # 80MHz
 
 # minimum rate to detect in Hz, if period is higher, continguous
 # timestamp analysis is reset
-min_rate = 10.0
+max_wait_duration_s = 2.0
 
 # Tell if concatenate timestamp to be sure packet are contiguous
 concatenate_timestamps = True
 
 # Tell if we want to compute statistics or not
 compute_stats = True
+# compute_stats = True
 
 # Tell if we record timetamps
 record_timetamps = False
+# record_timetamps = True
 
 # UDP packet size
 fragment_size = fragment_header_size + fragment_data_size
@@ -108,7 +110,7 @@ while True:
   transfer_duration = transfer_end_time - first_fragment_time
 
   # if we waited too long, throw away last timestamps for all lines
-  if wait_duration > 1/min_rate:
+  if wait_duration > max_wait_duration_s:
     last_timestamps[0:lines] = [[] for i in range(lines)]
     last_packet_id[0:lines] = [-1 for i in range(lines)]
     wait_duration = 0
