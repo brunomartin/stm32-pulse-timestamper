@@ -23,3 +23,5 @@ docs/html
 
 # generated files
 timestamps_*.txt
+
+.venv

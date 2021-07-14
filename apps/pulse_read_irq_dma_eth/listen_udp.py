@@ -6,9 +6,28 @@ import socket
 import struct
 import time
 import math
+import argparse
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument("-s", "--statistics",
+                    help="compute statistics",
+                    action="store_true",
+                    default=False)
+
+parser.add_argument("-r", "--record",
+                    help="record timestamps",
+                    action="store_true",
+                    default=False)
+
+parser.add_argument("-p", "--port",
+                    help="port where timestamps are sent",
+                    default=8042)
+
+args = parser.parse_args()
 
 UDP_IP = ""
-UDP_PORT = 8042
+UDP_PORT = args.port
 
 lines = 2
 
@@ -35,16 +54,17 @@ counter_precision = 0.0125 # 80MHz
 # timestamp analysis is reset
 max_wait_duration_s = 2.0
 
-# Tell if concatenate timestamp to be sure packet are contiguous
-concatenate_timestamps = True
-
 # Tell if we want to compute statistics or not
-compute_stats = True
+compute_stats = args.statistics
 # compute_stats = True
 
-# Tell if we record timetamps
-record_timetamps = False
+# Tell if we record timestamps
+record_timetamps = args.record
 # record_timetamps = True
+
+print("port: {}".format(UDP_PORT))
+print("compute_stats: {}".format(compute_stats))
+print("record_timetamps: {}".format(record_timetamps))
 
 # UDP packet size
 fragment_size = fragment_header_size + fragment_data_size
@@ -155,12 +175,8 @@ while True:
   if compute_stats:
 
     # concatenate with last timestamps to ensure continuity
-    # if we did not wait too long
-    if concatenate_timestamps:
-      timestamps = last_timestamps[line] + new_timestamps
-      last_timestamps[line] = new_timestamps
-    else:
-      timestamps = new_timestamps
+    timestamps = last_timestamps[line] + new_timestamps
+    last_timestamps[line] = new_timestamps
 
     # unwrap timestamps according to counter period
     for i in range(1, len(timestamps)):
