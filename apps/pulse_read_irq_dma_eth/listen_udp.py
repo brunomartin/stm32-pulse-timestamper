@@ -7,6 +7,37 @@ import struct
 import time
 import math
 import argparse
+import threading
+import queue
+
+
+class RecordThread(threading.Thread):
+    def __init__(self, queue, files, *args, **kwargs):
+        super(RecordThread, self).__init__(*args, **kwargs)
+        self.queue = queue
+        self.files = files
+        self.stop = False
+
+    def run(self):
+        while not self.stop:
+            # Wait for item in queue, if none after 0.5 seconds,
+            # continue to check if program is stopped
+            try:
+                header, data = self.queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
+
+            # Extract metada and data from header and data
+            line, packet_id, fragment_id = list(struct.unpack('{}I'.format(3), header))
+            timestamps = list(struct.unpack('{}I'.format(int(len(data) / 4)), data))
+
+            # Record it to file, this one must be open and writable
+            for timestamp in timestamps:
+                line_str = str(packet_id) + "/" + str(fragment_id)
+                line_str += " : "
+                line_str += str(timestamp)
+                self.files[line].write(line_str + "\n")
+
 
 parser = argparse.ArgumentParser()
 
@@ -46,9 +77,9 @@ fragment_count = 4
 counter_period = 4000000000
 
 # timestamp precision in us
-counter_precision = 1.0 # 1MHz
-counter_precision = 0.1 # 10MHz
-counter_precision = 0.0125 # 80MHz
+counter_precision = 1.0  # 1MHz
+counter_precision = 0.1  # 10MHz
+counter_precision = 0.0125  # 80MHz
 
 # minimum rate to detect in Hz, if period is higher, continguous
 # timestamp analysis is reset
@@ -78,7 +109,6 @@ header = bytearray(header_size)
 data = bytearray(data_size)
 
 # initialize lists for each line
-# headers = []
 timestamps = []
 last_timestamps = []
 
@@ -95,175 +125,201 @@ for i in range(lines):
     wait_duration_start.append(time.time())
     pulses.append(0)
 
-while True:
+record_queue = queue.Queue()
 
-    for fragment_id in range(0, fragment_count):
+if record_timetamps:
 
-        # Receive and store whole fragment
-        fragment, addr = sock.recvfrom(fragment_size)
+    files = []
+    for line in range(lines):
+        files.append(open("timestamps_" + str(line) + ".txt", "a"))
 
-        # extract header from fragment
-        if header_size > 0:
-            header_start = fragment_id * fragment_header_size
-            header_end = header_start + fragment_header_size
-            header[header_start:header_end] = fragment[:fragment_header_size]
+    record_thread = RecordThread(record_queue, files)
+    record_thread.start()
 
-        # extract data from fragment
-        data_start = fragment_id * fragment_data_size
-        data_end = data_start + fragment_data_size
-        data[data_start:data_end] = fragment[fragment_header_size:]
+try:
+    while True:
 
-        if fragment_id == 0:
-            first_fragment_time = time.time()
+        record_duration = 0
 
-    # unpack header content : line, packet_id, fragment_id
-    headers = list(struct.unpack('III' * fragment_count, header))
+        for fragment_index in range(0, fragment_count):
 
-    line = headers[0]
-    packet_id = headers[1]
-    fragment_id = headers[2]
+            # Receive and store whole fragment
+            fragment, addr = sock.recvfrom(fragment_size)
 
-    # compute timings involved
-    transfer_end_time = time.time()
-    wait_duration = transfer_end_time - wait_duration_start[line]
-    wait_duration_start[line] = transfer_end_time
-    transfer_duration = transfer_end_time - first_fragment_time
+            fragment_header = fragment[:fragment_header_size]
+            fragment_data = fragment[fragment_header_size:]
 
-    # if we waited too long, throw away last timestamps for all lines
-    if wait_duration > max_wait_duration_s:
-        last_timestamps[0:lines] = [[] for i in range(lines)]
-        last_packet_id[0:lines] = [-1 for i in range(lines)]
-        wait_duration = 0
+            # extract header from fragment
+            if header_size > 0:
+                header_start = fragment_index * fragment_header_size
+                header_end = header_start + fragment_header_size
+                header[header_start:header_end] = fragment_header
 
-    process_time = time.time()
+            # extract data from fragment
+            data_start = fragment_index * fragment_data_size
+            data_end = data_start + fragment_data_size
+            data[data_start:data_end] = fragment_data
 
-    # convert data to uint32 array
-    new_timestamps = list(struct.unpack('{}I'.format(int(len(data) / 4)), data))
+            if fragment_index == 0:
+                first_fragment_time = time.time()
 
-    record_time = time.time()
+            fragment_record_time = time.time()
+            if record_timetamps:
+                message = fragment_header, fragment_data
+                record_queue.put_nowait(message)
 
-    if record_timetamps:
-        with open("timestamps_" + str(line) + ".txt", "a") as file:
-            for timestamp in new_timestamps:
-                file.write(str(timestamp) + "\n")
+                if record_queue.qsize() > 10:
+                    print("record_queue.qsize(): {}".format(record_queue.qsize()))
 
-    record_duration = time.time() - record_time
+            fragment_record_duration = time.time() - fragment_record_time
+            record_duration += fragment_record_duration
 
-    # Detect discontinuation in packet ids
-    if last_packet_id[line] == -1:
-        last_packet_id[line] = packet_id
-    else:
-        if packet_id != last_packet_id[line] + 1:
-            print(fragment)
-            print(headers)
-            print(new_timestamps)
-            print(
-                "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n"
-                "% packet_id ({}) != last_packet_id + 1 ({}) %\n"
-                "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n"
-                .format(packet_id, last_packet_id + 1))
-            exit(-1)
+        # unpack header content : line, packet_id, fragment_id
+        headers = list(struct.unpack('{}I'.format(3), header[0:12]))
 
-        last_packet_id[line] = packet_id
+        line = headers[0]
+        packet_id = headers[1]
 
-    # remove trailing magic value if any
-    new_timestamps = [x for x in new_timestamps if x < counter_period]
+        # compute timings involved
+        transfer_end_time = time.time()
+        wait_duration = transfer_end_time - wait_duration_start[line]
+        wait_duration_start[line] = transfer_end_time
+        transfer_duration = transfer_end_time - first_fragment_time
 
-    # Increment total number of pulses from script start
-    pulses[line] += len(new_timestamps)
+        # if we waited too long, throw away last timestamps for all lines
+        if wait_duration > max_wait_duration_s:
+            last_timestamps[0:lines] = [[] for i in range(lines)]
+            last_packet_id[0:lines] = [-1 for i in range(lines)]
+            wait_duration = 0
 
-    if compute_stats:
+        process_time = time.time()
 
-        # concatenate with last timestamps to ensure continuity
-        timestamps = last_timestamps[line] + new_timestamps
-        last_timestamps[line] = new_timestamps
+        # convert data to uint32 array
+        new_timestamps = list(struct.unpack('{}I'.format(int(len(data) / 4)), data))
 
-        # unwrap timestamps according to counter period
-        for i in range(1, len(timestamps)):
-            while timestamps[i] - timestamps[i-1] < -counter_period/2:
-                timestamps[i] += counter_period
+        # Detect discontinuation in packet ids
+        if last_packet_id[line] == -1:
+            last_packet_id[line] = packet_id
+        else:
+            if packet_id != last_packet_id[line] + 1:
+                print(fragment)
+                print(headers)
+                print(new_timestamps)
+                print(
+                    "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n"
+                    "% packet_id ({}) != last_packet_id + 1 ({}) %\n"
+                    "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n"
+                    .format(packet_id, last_packet_id[line] + 1))
+                exit(-1)
 
-        # convert timestamps to float
-        for i in range(len(timestamps)):
-            timestamps[i] = float(timestamps[i])
+            last_packet_id[line] = packet_id
 
-        if len(timestamps) == 1:
-            continue
+        # remove trailing magic value if any
+        new_timestamps = [x for x in new_timestamps if x < counter_period]
 
-        # compute durations from timestamps
-        durations = [(timestamps[i] - timestamps[i-1]) for i in range(1, len(timestamps)-1)]
+        # Increment total number of pulses from script start
+        pulses[line] += len(new_timestamps)
 
-        # apply conversion according to precision
-        durations = [duration*counter_precision for duration in durations]
+        if compute_stats:
 
-        def compute_statistics(values):
-            average = 0
-            min = values[0]
-            max = values[0]
-            for value in values:
-                average += value
-                min = value if value < min else min
-                max = value if value > max else max
-            average /= len(values)
+            # concatenate with last timestamps to ensure continuity
+            timestamps = last_timestamps[line] + new_timestamps
+            last_timestamps[line] = new_timestamps
 
-            std_dev = 0
-            for duration in values:
-                std_dev += (duration - average)**2
-            std_dev /= len(values)
-            std_dev = math.sqrt(std_dev)
+            # unwrap timestamps according to counter period
+            for i in range(1, len(timestamps)):
+                while timestamps[i] - timestamps[i-1] < -counter_period/2:
+                    timestamps[i] += counter_period
 
-            return average, std_dev, min, max
+            # convert timestamps to float
+            for i in range(len(timestamps)):
+                timestamps[i] = float(timestamps[i])
 
-        # compute statistics
-        average, std_dev, min, max = compute_statistics(durations)
+            if len(timestamps) == 1:
+                continue
 
-        rate = math.nan
-        if average != 0:
-            rate = 1/average
+            # compute durations from timestamps
+            durations = [(timestamps[i] - timestamps[i-1]) for i in range(1, len(timestamps)-1)]
 
-        if std_dev > 10:
-            print(
-              "%%%%%%%%%%%%%%%%\n"
-              "% std_dev > 10 %\n"
-              "%%%%%%%%%%%%%%%%"
-              )
-            exit(-1)
+            # apply conversion according to precision
+            durations = [duration*counter_precision for duration in durations]
 
-        compute_delay = (lines > 1) and (line == 1)
-        for i in range(lines):
-            compute_delay &= len(last_timestamps[i]) > 0
+            def compute_statistics(values):
+                average = 0
+                min = values[0]
+                max = values[0]
+                for value in values:
+                    average += value
+                    min = value if value < min else min
+                    max = value if value > max else max
+                average /= len(values)
 
-        if compute_delay:
-            # compute delay between line 1 pulse and line 0 pulse
-            delays = [(last_timestamps[1][i] - last_timestamps[0][i]) for
-              i in range(len(last_timestamps))]
+                std_dev = 0
+                for duration in values:
+                    std_dev += (duration - average)**2
+                std_dev /= len(values)
+                std_dev = math.sqrt(std_dev)
 
-            delays = [delay*counter_precision for delay in delays]
+                return average, std_dev, min, max
 
-            delay_average, delay_std_dev, delay_min, delay_max = compute_statistics(delays)
+            # compute statistics
+            average, std_dev, min, max = compute_statistics(durations)
 
-    process_duration = time.time() - process_time
+            rate = math.nan
+            if average != 0:
+                rate = 1/average
 
-    # print statistics if we computed them
-    if compute_stats:
-        print("  average: {:.2f}us, dev: {:5.2f}us, min: {:5.2f}us,"
-            " max: {:5.2f}us, rate: {:.2f}kHz".format(
-            average, std_dev, min, max, rate*1000))
+            if std_dev > 10:
+                print(
+                  "%%%%%%%%%%%%%%%%\n"
+                  "% std_dev > 10 %\n"
+                  "%%%%%%%%%%%%%%%%"
+                  )
+                exit(-1)
 
-        if compute_delay:
-            print("  delay: average: {:.2f}us, dev: {:5.2f}us, min: {:5.2f}us,"
-                " max: {:5.2f}us".format(
-            delay_average, delay_std_dev, delay_min, delay_max))
+            compute_delay = (lines > 1) and (line == 1)
+            for i in range(lines):
+                compute_delay &= len(last_timestamps[i]) > 0
 
-    else:  # compute stats
-        average = new_timestamps[-1] - new_timestamps[0]
-        average /= len(new_timestamps) - 1
-        average *= counter_precision
-        rate = 1/average if average != 0 else math.nan
-        print("  average: {:.2f}us, rate: {:.2f}kHz".format(
-          average, rate*1000))
+            if compute_delay:
+                # compute delay between line 1 pulse and line 0 pulse
+                delays = [(last_timestamps[1][i] - last_timestamps[0][i]) for
+                  i in range(len(last_timestamps))]
 
-    # print it for information
-    print("{}/{}: waited: {:4.1f}ms, Tx: {:3.0f}us, proc: {:4.1f}ms, rec: {:4.1f}ms, pulses: {}"
-        .format(line, packet_id, wait_duration*1e3, transfer_duration*1e6,
-        process_duration*1e3, record_duration*1e3, pulses[line]))
+                delays = [delay*counter_precision for delay in delays]
+
+                delay_average, delay_std_dev, delay_min, delay_max = compute_statistics(delays)
+
+        process_duration = time.time() - process_time
+
+        # print statistics if we computed them
+        if compute_stats:
+            print("  average: {:.2f}us, dev: {:5.2f}us, min: {:5.2f}us,"
+                " max: {:5.2f}us, rate: {:.2f}kHz".format(
+                average, std_dev, min, max, rate*1000))
+
+            if compute_delay:
+                print("  delay: average: {:.2f}us, dev: {:5.2f}us, min: {:5.2f}us,"
+                    " max: {:5.2f}us".format(
+                delay_average, delay_std_dev, delay_min, delay_max))
+
+        else:  # compute stats
+            average = new_timestamps[-1] - new_timestamps[0]
+            average /= len(new_timestamps) - 1
+            average *= counter_precision
+            rate = 1/average if average != 0 else math.nan
+            print("  average: {:.2f}us, rate: {:.2f}kHz".format(
+              average, rate*1000))
+
+        # print it for information
+        print("{}/{}: waited: {:4.1f}ms, Tx: {:3.0f}us, proc: {:4.1f}ms, rec: {:4.1f}ms, pulses: {}"
+            .format(line, packet_id, wait_duration*1e3, transfer_duration*1e6,
+            process_duration*1e3, record_duration*1e3, pulses[line]))
+
+except (KeyboardInterrupt, SystemExit):
+    print("\n! Received keyboard interrupt, quitting threads.\n")
+
+# Wait for recording thread if it is running
+if record_timetamps:
+    record_thread.stop = True
+    record_thread.join()
