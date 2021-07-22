@@ -8,8 +8,9 @@ import time
 import math
 import argparse
 import queue
+import os
 
-from record_thread import RecordThreadText
+from record_thread import RecordThreadText, RecordThreadBinary, RecordThreadBinaryLog, RecordThreadBinaryRotated
 
 parser = argparse.ArgumentParser()
 
@@ -98,10 +99,15 @@ for i in range(lines):
     pulses.append(0)
 
 record_queue = queue.Queue()
-record_thread = RecordThreadText(record_queue, lines)
+# record_thread = RecordThreadText(record_queue, lines)
+# record_thread = RecordThreadBinary(record_queue, lines)
+# record_thread = RecordThreadBinaryLog(record_queue, lines)
+record_thread = RecordThreadBinaryRotated(record_queue, lines)
 
 if record_timetamps:
     record_thread.start()
+    print("os.getgid(): {}".format(os.getgid()))
+    # print("record_thread.pid: {}".format(record_thread.pid))
 
 try:
     while True:
@@ -135,14 +141,15 @@ try:
                 message = fragment_header, fragment_data
                 record_queue.put_nowait(message)
 
-                if record_queue.qsize() > 10:
+                if record_queue.qsize() > 200:
                     print("record_queue.qsize(): {}".format(record_queue.qsize()))
+                    exit(-1)
 
             fragment_record_duration = time.time() - fragment_record_time
             record_duration += fragment_record_duration
 
         # unpack header content : line, packet_id, fragment_id
-        headers = list(struct.unpack('{}I'.format(3), header[0:12]))
+        headers = list(struct.unpack('3I', header[0:12]))
 
         line = headers[0]
         packet_id = headers[1]
@@ -169,9 +176,9 @@ try:
             last_packet_id[line] = packet_id
         else:
             if packet_id != last_packet_id[line] + 1:
-                print(fragment)
-                print(headers)
-                print(new_timestamps)
+                # print(fragment)
+                # print(headers)
+                # print(new_timestamps)
                 print(
                     "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n"
                     "% packet_id ({}) != last_packet_id + 1 ({}) %\n"

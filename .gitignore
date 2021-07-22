@@ -23,5 +23,7 @@ docs/html
 
 # generated files
 timestamps_*.txt
+timestamps_*.bin
+timestamps_*.log
 
 .venv
