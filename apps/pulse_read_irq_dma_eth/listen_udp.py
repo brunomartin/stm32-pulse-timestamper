@@ -21,8 +21,7 @@ parser.add_argument("-s", "--statistics",
 
 parser.add_argument("-r", "--record",
                     help="record timestamps",
-                    action="store_true",
-                    default=False)
+                    default="none")
 
 parser.add_argument("-p", "--port",
                     help="port where timestamps are sent",
@@ -63,12 +62,12 @@ compute_stats = args.statistics
 # compute_stats = True
 
 # Tell if we record timestamps
-record_timetamps = args.record
+record_timetamps = args.record != "none"
 # record_timetamps = True
 
 print("port: {}".format(UDP_PORT))
 print("compute_stats: {}".format(compute_stats))
-print("record_timetamps: {}".format(record_timetamps))
+print("record_timetamps: {}".format(args.record))
 
 # UDP packet size
 fragment_size = fragment_header_size + fragment_data_size
@@ -101,8 +100,15 @@ for i in range(lines):
 record_queue = queue.Queue()
 # record_thread = RecordThreadText(record_queue, lines)
 # record_thread = RecordThreadBinary(record_queue, lines)
-record_thread = RecordThreadTextRotated(record_queue, lines)
-# record_thread = RecordThreadBinaryRotated(record_queue, lines)
+if args.record == "none":
+    pass
+elif args.record == "bin":
+    record_thread = RecordThreadBinaryRotated(record_queue, lines)
+elif args.record == "txt":
+    record_thread = RecordThreadTextRotated(record_queue, lines)
+else:
+    print("-r can be none, bin or txt")
+    exit(-1)
 
 if record_timetamps:
     record_thread.start()
