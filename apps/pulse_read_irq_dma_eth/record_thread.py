@@ -78,8 +78,6 @@ class RecordThreadText(RecordThread):
 
     def record(self, line, packet_id, fragment_id, timestamps):
         for timestamp in timestamps:
-            # line_str = str(packet_id) + "/" + str(fragment_id)
-            # line_str += " : "
             line_str = str(timestamp)
             self.files[line].write(line_str + "\n")
 
@@ -107,49 +105,58 @@ class RecordThreadBinary(RecordThreadText):
         self.files[line].flush()
 
 
-# Simple binary file recorder
-# to print timestamp in integer one per line type the following command:
-# hexdump -v -e '1/4 "%08u " "\n"' timestamps_1.bin
-class RecordThreadBinaryLog(RecordThread):
+# Rotated text file recorder
+class RecordThreadTextRotated(RecordThreadText):
     def __init__(self, *args, **kwargs):
-        super(RecordThreadBinaryLog, self).__init__(*args, **kwargs)
-        self.loggers = []
+        super(RecordThreadTextRotated, self).__init__(*args, **kwargs)
+
+        self.current_files = []
+        for line in range(self.lines):
+            self.current_files.append(1)
 
     def open_files(self):
         if len(self.files) > 0:
             raise Exception("Files already open")
 
         for line in range(self.lines):
-            handler = RotatingFileHandler("timestamps_" + str(line) + ".log",
-                                          "ab", maxBytes=8*1024**2, backupCount=1024)
 
-            self.files.append(handler)
+            self.current_files[line] = 1
+            base_filename = "timestamps_" + str(line)
+            while True:
+                filename = base_filename + "_" + str(self.current_files[line]) + ".txt"
 
-            logger = logging.getLogger("Rotating Log " + str(line))
-            logger.setLevel(logging.INFO)
+                if not Path(filename).exists():
+                    self.current_files[line] -= 1
+                    break
 
-            logger.addHandler(handler)
+                self.current_files[line] += 1
 
-            self.loggers.append(logger)
-
-    def close_files(self):
-        for file in self.files:
-            file.close()
-        self.files = []
+            filename = base_filename + "_" + str(self.current_files[line]) + ".txt"
+            file = open(filename, "a")
+            self.files.append(file)
 
     def record(self, line, packet_id, fragment_id, timestamps):
 
-        for i in range(len(timestamps)):
-            timestamps[i] = int(i)
+        file = self.files[line]
 
-        data = struct.pack('{}I'.format(len(timestamps)), *timestamps)
-        self.loggers[line].info(data)
-        pass
+        for timestamp in timestamps:
+            line_str = str(timestamp)
+            file.write(line_str + "\n")
+
+        file.flush()
+
+        if Path(file.name).stat().st_size >= 10*1000*1000:
+            file.close()
+            self.current_files[line] += 1
+            filename = "timestamps_" + str(line)
+            filename += "_" + str(self.current_files[line]) + ".txt"
+            file = open(filename, "a")
+            self.files[line] = file
 
 
-# Binary file recorder
+# Rotated binary file recorder
 # to print timestamp in integer one per line type the following command:
-# hexdump -v -e '1/4 "%08u " "\n"' timestamps_1.bin
+# hexdump -v -e '1/4 "%08u " "\n"' timestamps_0_0.bin
 class RecordThreadBinaryRotated(RecordThreadText):
     def __init__(self, *args, **kwargs):
         super(RecordThreadBinaryRotated, self).__init__(*args, **kwargs)
@@ -187,13 +194,10 @@ class RecordThreadBinaryRotated(RecordThreadText):
         file.write(data)
         file.flush()
 
-        if Path(file.name).stat().st_size > 16*1024*1024:
+        if Path(file.name).stat().st_size >= 10*1000*1000:
             file.close()
             self.current_files[line] += 1
             filename = "timestamps_" + str(line)
             filename += "_" + str(self.current_files[line]) + ".bin"
             file = open(filename, "ab")
             self.files[line] = file
-
-
-

@@ -10,7 +10,7 @@ import argparse
 import queue
 import os
 
-from record_thread import RecordThreadText, RecordThreadBinary, RecordThreadBinaryLog, RecordThreadBinaryRotated
+from record_thread import RecordThreadText, RecordThreadBinary, RecordThreadTextRotated, RecordThreadBinaryRotated
 
 parser = argparse.ArgumentParser()
 
@@ -101,8 +101,8 @@ for i in range(lines):
 record_queue = queue.Queue()
 # record_thread = RecordThreadText(record_queue, lines)
 # record_thread = RecordThreadBinary(record_queue, lines)
-# record_thread = RecordThreadBinaryLog(record_queue, lines)
-record_thread = RecordThreadBinaryRotated(record_queue, lines)
+record_thread = RecordThreadTextRotated(record_queue, lines)
+# record_thread = RecordThreadBinaryRotated(record_queue, lines)
 
 if record_timetamps:
     record_thread.start()
@@ -133,6 +133,14 @@ try:
             data_end = data_start + fragment_data_size
             data[data_start:data_end] = fragment_data
 
+            # Check if fragment id is consistent with current index
+            fragment_id = list(struct.unpack('I', fragment_header[8:12]))[0]
+            if fragment_index != fragment_id:
+                print("fragment_index ({}) != fragment_id ({})".format(
+                    fragment_index, fragment_id))
+                exit(-1)
+
+            # Begin duration measurement for fragments acquiring
             if fragment_index == 0:
                 first_fragment_time = time.time()
 
@@ -141,6 +149,7 @@ try:
                 message = fragment_header, fragment_data
                 record_queue.put_nowait(message)
 
+                # Check if there is no contention in record queue
                 if record_queue.qsize() > 200:
                     print("record_queue.qsize(): {}".format(record_queue.qsize()))
                     exit(-1)
