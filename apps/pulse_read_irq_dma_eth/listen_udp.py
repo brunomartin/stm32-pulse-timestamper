@@ -7,37 +7,9 @@ import struct
 import time
 import math
 import argparse
-import threading
 import queue
 
-
-class RecordThread(threading.Thread):
-    def __init__(self, queue, files, *args, **kwargs):
-        super(RecordThread, self).__init__(*args, **kwargs)
-        self.queue = queue
-        self.files = files
-        self.stop = False
-
-    def run(self):
-        while not self.stop:
-            # Wait for item in queue, if none after 0.5 seconds,
-            # continue to check if program is stopped
-            try:
-                header, data = self.queue.get(timeout=0.5)
-            except queue.Empty:
-                continue
-
-            # Extract metada and data from header and data
-            line, packet_id, fragment_id = list(struct.unpack('{}I'.format(3), header))
-            timestamps = list(struct.unpack('{}I'.format(int(len(data) / 4)), data))
-
-            # Record it to file, this one must be open and writable
-            for timestamp in timestamps:
-                line_str = str(packet_id) + "/" + str(fragment_id)
-                line_str += " : "
-                line_str += str(timestamp)
-                self.files[line].write(line_str + "\n")
-
+from record_thread import RecordThreadText
 
 parser = argparse.ArgumentParser()
 
@@ -62,13 +34,13 @@ UDP_PORT = args.port
 
 lines = 2
 
-sock = socket.socket(socket.AF_INET, # Internet
-                     socket.SOCK_DGRAM) # UDP
+sock = socket.socket(socket.AF_INET,  # Internet
+                     socket.SOCK_DGRAM)  # UDP
 sock.bind((UDP_IP, UDP_PORT))
 
 # UDP packet sizes
 fragment_header_size = 12
-fragment_data_size = 1000 # 250x4
+fragment_data_size = 1000  # 250x4
 
 # UDP packet fragment count
 fragment_count = 4
@@ -126,14 +98,9 @@ for i in range(lines):
     pulses.append(0)
 
 record_queue = queue.Queue()
+record_thread = RecordThreadText(record_queue, lines)
 
 if record_timetamps:
-
-    files = []
-    for line in range(lines):
-        files.append(open("timestamps_" + str(line) + ".txt", "a"))
-
-    record_thread = RecordThread(record_queue, files)
     record_thread.start()
 
 try:
@@ -321,5 +288,4 @@ except (KeyboardInterrupt, SystemExit):
 
 # Wait for recording thread if it is running
 if record_timetamps:
-    record_thread.stop = True
-    record_thread.join()
+    record_thread.stop()
