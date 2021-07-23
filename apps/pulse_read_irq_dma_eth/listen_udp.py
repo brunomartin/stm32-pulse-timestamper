@@ -8,9 +8,10 @@ import time
 import math
 import argparse
 import queue
-import os
 
-from record_thread import RecordThreadText, RecordThreadBinary, RecordThreadTextRotated, RecordThreadBinaryRotated
+from receive_thread import ReceiveThread
+from record_thread import RecordThreadTextRotated, RecordThreadBinaryRotated
+from statistics_thread import StatisticThread
 
 parser = argparse.ArgumentParser()
 
@@ -19,9 +20,10 @@ parser.add_argument("-s", "--statistics",
                     action="store_true",
                     default=False)
 
-parser.add_argument("-r", "--record",
-                    help="record timestamps",
-                    default="none")
+parser.add_argument("-r", "--recorder",
+                    help="timestamps recorder (none, bin or txt)",
+                    default="none",
+                    choices=['none', 'bin', 'txt'])
 
 parser.add_argument("-p", "--port",
                     help="port where timestamps are sent",
@@ -30,13 +32,12 @@ parser.add_argument("-p", "--port",
 args = parser.parse_args()
 
 UDP_IP = ""
-UDP_PORT = args.port
+port = args.port
 
 lines = 2
 
 sock = socket.socket(socket.AF_INET,  # Internet
                      socket.SOCK_DGRAM)  # UDP
-sock.bind((UDP_IP, UDP_PORT))
 
 # UDP packet sizes
 fragment_header_size = 12
@@ -53,7 +54,7 @@ counter_precision = 1.0  # 1MHz
 counter_precision = 0.1  # 10MHz
 counter_precision = 0.0125  # 80MHz
 
-# minimum rate to detect in Hz, if period is higher, continguous
+# minimum rate to detect in Hz, if period is higher, contiguous
 # timestamp analysis is reset
 max_wait_duration_s = 2.0
 
@@ -62,12 +63,12 @@ compute_stats = args.statistics
 # compute_stats = True
 
 # Tell if we record timestamps
-record_timetamps = args.record != "none"
-# record_timetamps = True
+recorder = args.recorder
+record_timetamps = recorder != "none"
 
-print("port: {}".format(UDP_PORT))
+print("port: {}".format(port))
 print("compute_stats: {}".format(compute_stats))
-print("record_timetamps: {}".format(args.record))
+print("recorder: {}".format(recorder))
 
 # UDP packet size
 fragment_size = fragment_header_size + fragment_data_size
@@ -97,23 +98,58 @@ for i in range(lines):
     wait_duration_start.append(time.time())
     pulses.append(0)
 
-record_queue = queue.Queue()
-# record_thread = RecordThreadText(record_queue, lines)
-# record_thread = RecordThreadBinary(record_queue, lines)
-if args.record == "none":
+record_queue = None
+if args.recorder == "none":
     pass
-elif args.record == "bin":
+elif args.recorder == "bin":
+    record_queue = queue.Queue()
     record_thread = RecordThreadBinaryRotated(record_queue, lines)
-elif args.record == "txt":
+elif args.recorder == "txt":
+    record_queue = queue.Queue()
     record_thread = RecordThreadTextRotated(record_queue, lines)
-else:
-    print("-r can be none, bin or txt")
-    exit(-1)
 
 if record_timetamps:
     record_thread.start()
-    print("os.getgid(): {}".format(os.getgid()))
-    # print("record_thread.pid: {}".format(record_thread.pid))
+
+statistic_queue = None
+if compute_stats:
+    statistic_queue = queue.Queue()
+    statistic_thread = StatisticThread(
+        statistic_queue, lines, counter_period=counter_period,
+        counter_precision=counter_precision)
+    statistic_thread.start()
+
+receive_thread = ReceiveThread(
+    port=port, header_size=fragment_header_size, data_size=fragment_data_size,
+    fragments_per_packet=fragment_count, lines=lines,
+    record_queue=record_queue, statistic_queue=statistic_queue
+)
+
+receive_thread.start()
+
+try:
+
+    while True:
+        time.sleep(1)
+
+except (KeyboardInterrupt, SystemExit):
+    print("\n! Received keyboard interrupt, quitting threads.\n")
+
+receive_thread.stop()
+
+statistic_thread.stop()
+
+# Wait for recording thread if it is running
+if record_timetamps:
+    record_thread.stop()
+
+if compute_stats:
+    statistic_thread.stop()
+
+
+exit(0)
+
+# sock.bind((UDP_IP, port))
 
 try:
     while True:
@@ -140,7 +176,7 @@ try:
             data[data_start:data_end] = fragment_data
 
             # Check if fragment id is consistent with current index
-            fragment_id = list(struct.unpack('I', fragment_header[8:12]))[0]
+            line, packet_id, fragment_id = list(struct.unpack('{}I'.format(3), fragment_header))
             if fragment_index != fragment_id:
                 print("fragment_index ({}) != fragment_id ({})".format(
                     fragment_index, fragment_id))
@@ -151,7 +187,7 @@ try:
                 first_fragment_time = time.time()
 
             fragment_record_time = time.time()
-            if record_timetamps:
+            if record_queue:
                 message = fragment_header, fragment_data
                 record_queue.put_nowait(message)
 

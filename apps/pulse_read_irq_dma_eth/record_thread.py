@@ -1,13 +1,6 @@
-# This script listen uint32_t timestamps array on UDP port
-# To avoid UDP packet mixing, it must be executed on the network
-# "near" the pulse timestamper, e.g., not on wifi
-
 import struct
 import threading
 import queue
-
-import logging
-from logging.handlers import RotatingFileHandler
 
 from pathlib import Path
 
@@ -39,6 +32,9 @@ class RecordThread(threading.Thread):
     def __del__(self):
         self.close_files()
 
+    def record(self, header, data):
+        raise NotImplementedError()
+
     def record(self, line, packet_id, fragment_id, timestamps):
         raise NotImplementedError()
 
@@ -51,12 +47,7 @@ class RecordThread(threading.Thread):
             except queue.Empty:
                 continue
 
-            # Extract metada and data from header and data
-            line, packet_id, fragment_id = list(struct.unpack('{}I'.format(3), header))
-            timestamps = list(struct.unpack('{}I'.format(int(len(data) / 4)), data))
-
-            # Record it to file, this one must be open and writable
-            self.record(line, packet_id, fragment_id, timestamps)
+            self.record(header, data)
 
 
 # Simple text file recorder
@@ -76,7 +67,12 @@ class RecordThreadText(RecordThread):
             file.close()
         self.files = []
 
-    def record(self, line, packet_id, fragment_id, timestamps):
+    def record(self, header, data):
+
+        # Extract metadata and data from header and data
+        line, packet_id, fragment_id = list(struct.unpack('{}I'.format(3), header))
+        timestamps = list(struct.unpack('{}I'.format(int(len(data) / 4)), data))
+
         for timestamp in timestamps:
             line_str = str(timestamp)
             self.files[line].write(line_str + "\n")
@@ -99,8 +95,8 @@ class RecordThreadBinary(RecordThreadText):
             file = open("timestamps_" + str(line) + ".bin", "ab")
             self.files.append(file)
 
-    def record(self, line, packet_id, fragment_id, timestamps):
-        data = struct.pack('{}I'.format(len(timestamps)), *timestamps)
+    def record(self, header, data):
+        line, _, _ = list(struct.unpack('{}I'.format(3), header))
         self.files[line].write(data)
         self.files[line].flush()
 
@@ -135,7 +131,11 @@ class RecordThreadTextRotated(RecordThreadText):
             file = open(filename, "a")
             self.files.append(file)
 
-    def record(self, line, packet_id, fragment_id, timestamps):
+    def record(self, header, data):
+
+        # Extract metadata and data from header and data
+        line, packet_id, fragment_id = list(struct.unpack('{}I'.format(3), header))
+        timestamps = list(struct.unpack('{}I'.format(int(len(data) / 4)), data))
 
         file = self.files[line]
 
@@ -145,7 +145,7 @@ class RecordThreadTextRotated(RecordThreadText):
 
         file.flush()
 
-        if Path(file.name).stat().st_size >= 10*1000*1000:
+        if Path(file.name).stat().st_size >= 10*1024*1024:
             file.close()
             self.current_files[line] += 1
             filename = "timestamps_" + str(line)
@@ -186,15 +186,15 @@ class RecordThreadBinaryRotated(RecordThreadText):
             file = open(filename, "ab")
             self.files.append(file)
 
-    def record(self, line, packet_id, fragment_id, timestamps):
-        data = struct.pack('{}I'.format(len(timestamps)), *timestamps)
+    def record(self, header, data):
+        line, _, _ = list(struct.unpack('{}I'.format(3), header))
 
         file = self.files[line]
 
         file.write(data)
         file.flush()
 
-        if Path(file.name).stat().st_size >= 10*1000*1000:
+        if Path(file.name).stat().st_size >= 10*1024*1024:
             file.close()
             self.current_files[line] += 1
             filename = "timestamps_" + str(line)
