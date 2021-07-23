@@ -43,6 +43,10 @@ class StatisticThread(threading.Thread):
         for i in range(lines):
             self.timestamps.append([])
 
+        self.averages = []
+        for i in range(lines):
+            self.averages.append([])
+
         self.last_time = time.time()
 
     def start(self):
@@ -91,6 +95,9 @@ class StatisticThread(threading.Thread):
                 for line in range(self.lines):
                     timestamps = self.timestamps[line]
 
+                    if len(timestamps) < 2:
+                        continue
+
                     # unwrap timestamps according to counter period
                     for i in range(1, len(timestamps)):
                         while timestamps[i] - timestamps[i-1] < -self.counter_period/2:
@@ -104,25 +111,23 @@ class StatisticThread(threading.Thread):
                     durations = [duration*self.counter_precision for duration in durations]
 
                     # compute statistics
-                    average, std_dev, min, max = compute_statistics(durations)
+                    self.averages[line], std_dev, min, max = compute_statistics(durations)
 
                     rate = math.nan
-                    if average != 0:
-                        rate = 1/average
+                    if self.averages[line] != 0:
+                        rate = 1./self.averages[line]
 
                     print("{}: ({}k) av.: {:.2f}us, dev: {:5.2f}us, min: {:5.2f}us,"
                           " max: {:5.2f}us, rate: {:.2f}kHz".format(
-                        line, round(len(timestamps)/1e3), average, std_dev, min, max, rate*1000))
-
+                        line, round(len(timestamps)/1e3), self.averages[line],
+                        std_dev, min, max, rate*1000))
 
                 compute_delay = (self.lines > 1) and (line == 1)
-                for i in range(self.lines):
+                for line in range(self.lines):
                     compute_delay &= len(timestamps) > 0
 
                 if compute_delay:
                     # compute delay between line 1 pulse and line 0 pulse
-                    # delays = [(self.timestamps[1][i] - self.timestamps[0][i]) for
-                    #   i in range(len(timestamps[1]))]
 
                     mid = int(len(self.timestamps[0])/2)
 
@@ -153,7 +158,13 @@ class StatisticThread(threading.Thread):
 
                     delays = [delay*self.counter_precision for delay in delays]
 
-                    delay_average, delay_std_dev, delay_min, delay_max = compute_statistics(delays)
+                    delay_average = 0
+                    delay_std_dev = 0
+                    delay_min = 0
+                    delay_max = 0
+
+                    if len(delays) > 1:
+                        delay_average, delay_std_dev, delay_min, delay_max = compute_statistics(delays)
 
                     print("  delay: average: {:.2f}us, dev: {:5.2f}us, min: {:5.2f}us,"
                           " max: {:5.2f}us".format(
